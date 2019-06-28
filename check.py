@@ -1,12 +1,12 @@
 # Импорт нужных библиотек
 import requests
-from credentials import *
+from credentials import discord_message_id, discord_channel_id, discord_guild_id, discord_bot_token, emojitorole
 import json
 
 # Базовая ссылка на API дискорда
 base = 'https://discordapp.com/api/v6'
 # Авторизация бота в API
-headers = {'Authorization': 'Bot '+bottoken}
+headers = {'Authorization': 'Bot '+discord_bot_token}
 
 
 # Функция для получения роли по названию
@@ -67,11 +67,11 @@ def delete_reaction(channel_id, message_id, emoji, user_id):
 def check():
     try:
         # Получает список реакций к сообщению и парсит его в лист
-        r = requests.get(base + '/channels/' + channel_id + '/messages/' + message_id, headers=headers)
+        r = requests.get(base + '/channels/' + discord_channel_id + '/messages/' + discord_message_id, headers=headers)
         print(r.text)
         reactions = json.loads(r.text)['reactions']
         # Получает список пользователей сервера
-        members = get_members(guild_id)
+        members = get_members(discord_guild_id)
         for l in reactions:
             # Для каждой реакции получает ее id
             emoji = l['emoji']
@@ -81,13 +81,13 @@ def check():
             else:
                 emoji_id = '<:'+emoji['name']+':'+emoji['id']
             # Возвращает список пользователей, отреагировавших этой реакцией и парсит его в list
-            r = requests.get(base + '/channels/' + channel_id + '/messages/' + message_id + '/reactions/' + emoji_id,
+            r = requests.get(base + '/channels/' + discord_channel_id + '/messages/' + discord_message_id + '/reactions/' + emoji_id,
                              headers=headers)
             users = json.loads(r.text)
             # Если реакция является одним из смайликов ролей, то
             if emoji['name'] in emojitorole.keys():
                 # Получает id нужной роли по имени из emojitorole, описанного в credentials
-                role = get_role(guild_id, emojitorole[emoji['name']])['id']
+                role = get_role(discord_guild_id, emojitorole[emoji['name']])['id']
                 # Для каждого пользователя сервера
                 for member in members:
                     # Если это не бот, то
@@ -98,18 +98,18 @@ def check():
                             if role in member['roles']:
                                 # Удаляет ее
                                 print(member['user']['username'])
-                                remove_role(guild_id, member['user']['id'], role)
+                                remove_role(discord_guild_id, member['user']['id'], role)
                         # Иначе, если пользователь оставил реакцию
                         else:
                             # И при этом у него нет соответствующей роли
                             if role not in member['roles']:
                                 # Добавляет ему эту роль
                                 print(member['user']['username'])
-                                add_role(guild_id, member['user']['id'], role)
+                                add_role(discord_guild_id, member['user']['id'], role)
             # Иначе удаляет все ненужные реакции
             else:
                 for user in users:
-                    delete_reaction(channel_id, message_id, emoji_id, user['id'])
+                    delete_reaction(discord_channel_id, discord_message_id, emoji_id, user['id'])
     # В случае ошибки игнорирует ее и выводит текст этой ошибки
     except Exception as e:
         print('Ignored exception in check(): '+str(e))
