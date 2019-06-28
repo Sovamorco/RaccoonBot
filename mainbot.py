@@ -86,7 +86,7 @@ async def tts_(context, *args):
     create_mp3(text)
     if voice_channel is not None:
         vc = await voice_channel.connect()
-        vc.play(discord.FFmpegPCMAudio('output.mp3'), after=lambda e: print('done', e))
+        vc.play(discord.FFmpegPCMAudio('output.mp3'))
         while vc.is_playing():
             await asyncio.sleep(1)
         vc.stop()

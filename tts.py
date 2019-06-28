@@ -2,8 +2,6 @@ from google.cloud import texttospeech
 from google.oauth2 import service_account
 from google.cloud import translate_v3beta1 as translate
 
-from pydub import AudioSegment
-from pydub.playback import play
 import io
 from credentials import googleProjectID
 
@@ -32,11 +30,6 @@ def tts(text):
         audio_encoding=texttospeech.enums.AudioEncoding.MP3)
     response = ttsClient.synthesize_speech(synthesis_input, voice, audio_config)
     return response.audio_content
-
-
-def play_bytes(mp3bytes):
-    song = AudioSegment.from_file(io.BytesIO(mp3bytes), format="mp3")
-    play(song)
 
 
 def get_voice(lang_code):

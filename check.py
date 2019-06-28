@@ -68,7 +68,6 @@ def check():
     try:
         # Получает список реакций к сообщению и парсит его в лист
         r = requests.get(base + '/channels/' + discord_channel_id + '/messages/' + discord_message_id, headers=headers)
-        print(r.text)
         reactions = json.loads(r.text)['reactions']
         # Получает список пользователей сервера
         members = get_members(discord_guild_id)
