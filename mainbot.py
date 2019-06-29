@@ -1,11 +1,16 @@
 import discord
 from discord.ext import commands
 
+import time
 import asyncio
+import os
 from tts import *
 from check import *
+from music import *
 
 bot = commands.Bot(command_prefix=commands.when_mentioned_or('?'), description='Test bot')
+
+queue = []
 
 
 @bot.event
@@ -76,23 +81,136 @@ async def update(message):
 
 
 @bot.command(name='tts', pass_context=True)
-async def tts_(context, *args):
+async def tts_(context, *, text):
+    global queue
     user = context.message.author
     text_channel = context.message.channel
     voice_channel = user.voice.channel
-    if len(args) == 0:
+    if not text:
         return await text_channel.send('Использование: ?tts <сообщение>')
-    text = ' '.join(args)
-    create_mp3(text)
+    ts = time.time()
+    name = 'output{}.mp3'.format(ts)
+    create_mp3(text, name)
     if voice_channel is not None:
-        vc = await voice_channel.connect()
-        vc.play(discord.FFmpegPCMAudio('output.mp3'))
-        while vc.is_playing():
-            await asyncio.sleep(1)
+        try:
+            vc = await voice_channel.connect()
+            queue.append((name, discord.FFmpegPCMAudio(name)))
+        except discord.errors.ClientException:
+            queue.append((name, discord.FFmpegPCMAudio(name)))
+            return
+        while queue:
+            name, sound = queue[0]
+            vc.play(sound)
+            while vc.is_playing():
+                await asyncio.sleep(1)
+            if name:
+                os.remove(name)
+            del queue[0]
         vc.stop()
         await vc.disconnect()
     else:
         await text_channel.send('User is not in a channel.')
+
+
+@bot.command(name='why', pass_context=True)
+async def tts_(context, amt):
+    global queue
+    user = context.message.author
+    text_channel = context.message.channel
+    voice_channel = user.voice.channel
+    if not amt.isdigit():
+        return await text_channel.send('Использование: ?why <кол-во раз>')
+    if int(amt) > 20:
+        return await text_channel.send('Нет')
+    if voice_channel is not None:
+        try:
+            vc = await voice_channel.connect()
+            for i in range(int(amt)):
+                queue.append(('', discord.FFmpegPCMAudio('why.mp3')))
+        except discord.errors.ClientException:
+            for i in range(int(amt)):
+                queue.append(('', discord.FFmpegPCMAudio('why.mp3')))
+            return
+        while queue:
+            name, sound = queue[0]
+            vc.play(sound)
+            while vc.is_playing():
+                await asyncio.sleep(1)
+            if name:
+                os.remove(name)
+            del queue[0]
+        vc.stop()
+        await vc.disconnect()
+    else:
+        await text_channel.send('User is not in a channel.')
+
+
+@bot.command(name='music', pass_context=True)
+async def music_(context, *, text):
+    global queue
+    user = context.message.author
+    text_channel = context.message.channel
+    voice_channel = user.voice.channel
+    if not text:
+        return await text_channel.send('Использование: ?music <запрос>')
+    searchresults = searchyt(text)
+    embed = discord.Embed(title="Choose song")
+    embedValue = ''
+    for i in range(len(searchresults)):
+        title = searchresults[i]['title']
+        embedValue += '{}: {}\n'.format(i+1, title)
+    embed.add_field(name='Search results', value=embedValue, inline=False)
+    await text_channel.send(embed=embed)
+
+    def check(m):
+        if m.content.isdigit():
+            return (0 < int(m.content) < 11) and (m.channel == text_channel)
+        return False
+
+    msg = await bot.wait_for('message', check=check, timeout=60)
+    videoID = searchresults[int(msg.content)-1]['id']
+    url = searchresults[int(msg.content)-1]['url']
+    name = '{}.mp3'.format(videoID)
+    title = searchresults[int(msg.content)-1]['title']
+    download_video(url)
+    if voice_channel is not None:
+        try:
+            vc = await voice_channel.connect()
+            queue.append({
+                'name': name,
+                'player': discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(name), 0.2),
+                'title': title
+            })
+            await text_channel.send('Added {} to the queue'.format(title))
+        except discord.errors.ClientException:
+            queue.append({
+                'name': name,
+                'player': discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(name), 0.2),
+                'title': title
+            })
+            await text_channel.send('Added {} to the queue'.format(title))
+            return
+        while queue:
+            name = queue[0].get('name')
+            sound = queue[0].get('player')
+            title = queue[0].get('title')
+            vc.play(sound)
+            await text_channel.send('Now playing: {}'.format(title))
+            while vc.is_playing():
+                await asyncio.sleep(1)
+            if name:
+                os.remove(name)
+            del queue[0]
+        vc.stop()
+        await vc.disconnect()
+    else:
+        await text_channel.send('User is not in a channel.')
+
+
+@bot.command(name='leave', pass_context=True)
+async def leave_(context):
+    for vc in bot.voice_clients:
+        await vc.disconnect()
 
 
 bot.run(discord_bot_token)
