@@ -10,6 +10,7 @@ from check import *
 from music import *
 
 bot = commands.Bot(command_prefix=commands.when_mentioned_or('?'), description='Test bot')
+bot.remove_command('help')
 
 queue = []
 current = {}
@@ -23,7 +24,7 @@ async def on_ready():
     activity = discord.Streaming(name='Я живой OwO', url='https://twitch.tv/mrdandycorn')
     await bot.change_presence(activity=activity)
     # Проверка обновлений на сообщении, в случае, если что-то изменилось, пока бот был оффлайн
-    # check()
+    check()
     print('Logged on as', bot.user)
 
 
@@ -77,14 +78,15 @@ async def on_raw_reaction_remove(payload):
             pass
 
 
-@bot.command(name='update')
+@bot.command(name='update', hidden=True)
 async def update(message):
     async with message.channel.typing():
         check()
         await message.channel.send('Обновил роли!')
 
 
-@bot.command(name='tts', pass_context=True)
+@bot.command(name='tts', pass_context=True, help='Команда для преобразования текста в голос', usage='?tts <текст>',
+             brief='Синтез голоса')
 async def tts_(context, *, text):
     global queue
     user = context.message.author
@@ -110,7 +112,7 @@ async def tts_(context, *, text):
         await text_channel.send('Пользователь не подключен к каналу')
 
 
-@bot.command(name='why', pass_context=True)
+@bot.command(name='why', pass_context=True, help='Зачем', brief='Зачем', usage='?why <кол-во повторений>')
 async def why_(context, amt):
     global queue
     user = context.message.author
@@ -231,8 +233,7 @@ async def play(context, ignore=False):
         if not ignore:
             return await text_channel.send('Использование ?play <запрос/ссылка>')
     while queue:
-        current = queue[0]
-        del queue[0]
+        current = queue.pop(0)
         name = current.get('name')
         sound = current.get('player')
         title = current.get('title')
@@ -251,7 +252,9 @@ async def play(context, ignore=False):
     vc.stop()
 
 
-@bot.command(name='stream', aliases=['play'], pass_context=True)
+@bot.command(name='stream', aliases=['play'], pass_context=True, brief='Добавить трек',
+             help='Команда для добавления трека в очередь и/или начала проигрывания очереди',
+             usage='?[stream|play] [ссылка/название]')
 async def stream_(context, *, text=''):
     global queue
     user = context.message.author
@@ -310,7 +313,8 @@ async def stream_(context, *, text=''):
         await text_channel.send('Пользователь не подключен к каналу')
 
 
-@bot.command(name='leave', pass_context=True)
+@bot.command(name='leave', pass_context=True, help='Команда для выхода из голосового канала', brief='Покинуть',
+             usage='?leave')
 async def leave_(context):
     vc = context.voice_client
     text_channel = context.message.channel
@@ -320,7 +324,8 @@ async def leave_(context):
     return await text_channel.send('Отключен от канала')
 
 
-@bot.command(name='join', aliases=['connect'], pass_context=True)
+@bot.command(name='join', aliases=['connect'], pass_context=True, help='Команда для подключения к голосовому каналу',
+             brief='Подключиться', usage='?[join|connect]')
 async def join_(context):
     user = context.message.author
     text_channel = context.message.channel
@@ -337,7 +342,8 @@ async def join_(context):
     return await text_channel.send('Подключен к каналу {}'.format(voice_channel))
 
 
-@bot.command(name='np', aliases=['current', 'nowplaying'], pass_context=True)
+@bot.command(name='np', aliases=['current', 'nowplaying'], pass_context=True, brief='Текущий трек',
+             help='Команда для показа текущей плеера', usage='?[np|current|nowplaying]')
 async def np_(context):
     global current
     vc = context.voice_client
@@ -349,7 +355,8 @@ async def np_(context):
     return await text_channel.send('Сейчас играет: {}'.format(current['title']))
 
 
-@bot.command(name='queue', aliases=['q', 'playlist'], pass_context=True)
+@bot.command(name='queue', aliases=['q', 'playlist'], pass_context=True, brief='Очередь',
+             help='Команда для показа очереди плеера', usage='?[queue|q|playlist]')
 async def queue_(context):
     global queue
     global queue_msg
@@ -437,7 +444,8 @@ async def queue_(context):
                 await reaction.remove(user)
 
 
-@bot.command(name='shuffle', pass_context=True)
+@bot.command(name='shuffle', pass_context=True, help='Команда для перемешивания очереди плеера',
+             brief='Перемешать', usage='?shuffle')
 async def shuffle_(context):
     global queue
     vc = context.voice_client
@@ -450,7 +458,8 @@ async def shuffle_(context):
     return await text_channel.send('Очередь перемешана')
 
 
-@bot.command(name='stop', pass_context=True)
+@bot.command(name='stop', pass_context=True, help='Команда для остановки плеера и очистки очереди',
+             brief='Остановка плеера', usage='?stop')
 async def stop_(context):
     global queue_exists
     global current
@@ -469,7 +478,8 @@ async def stop_(context):
         await vc.disconnect()
 
 
-@bot.command(name='skip', pass_context=True)
+@bot.command(name='skip', pass_context=True, help='Команда для пропуска текущего трека',
+             brief='Пропуск трека', usage='?skip')
 async def skip_(context):
     global current
     vc = context.voice_client
@@ -481,6 +491,31 @@ async def skip_(context):
     if vc.is_playing():
         vc.stop()
         return await text_channel.send('{} пропущена')
+
+
+@bot.command(name='help', pass_context=True, help='Команда для показа этого сообщения',
+             brief='Помощь', usage='?help [команда]')
+async def help_(context, request=None):
+    text_channel = context.message.channel
+    if request is None:
+        embed = discord.Embed(title='Команды')
+        for command in bot.commands:
+            if not command.hidden:
+                if command.aliases:
+                    embed.add_field(name='[{}|{}]'.format(command.name, '|'.join(command.aliases)), value=command.brief)
+                else:
+                    embed.add_field(name=command.name, value=command.brief)
+        return await text_channel.send(embed=embed)
+    for command in bot.commands:
+        if ((command.name == request.lower()) or (request.lower() in command.aliases)) and not command.hidden:
+            if command.aliases:
+                embed = discord.Embed(title='[{}|{}]'.format(command.name, '|'.join(command.aliases)))
+            else:
+                embed = discord.Embed(title=command.name)
+            embed.add_field(name='Описание', value=command.help)
+            embed.add_field(name='Использование', value=command.usage)
+            return await text_channel.send(embed=embed)
+    return await text_channel.send('Нет команды {}'.format(request))
 
 
 bot.run(discord_bot_token)
