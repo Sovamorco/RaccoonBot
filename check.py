@@ -24,7 +24,6 @@ def get_role(guild, samplerole):
 def get_members(guild_id):
     # Получает список пользователей запросом и парсит его в лист, который и возвращает
     r = requests.get(base+'/guilds/'+guild_id+'/members?limit=100', headers=headers)
-    print(r.text)
     members = json.loads(r.text)
     return members
 
@@ -74,7 +73,6 @@ def check():
         for l in reactions:
             # Для каждой реакции получает ее id
             emoji = l['emoji']
-            print('Роль ' + emoji['name'])
             if emoji['id'] is None:
                 emoji_id = emoji['name']
             else:

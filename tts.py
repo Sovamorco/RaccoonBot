@@ -10,7 +10,7 @@ ttsClient = texttospeech.TextToSpeechClient(credentials=credentials)
 translateClient = translate.TranslationServiceClient(credentials=credentials)
 
 
-def detect_language(text):
+async def detect_language(text):
     location = 'global'
     parent = translateClient.location_path(googleProjectID, location)
     response = translateClient.detect_language(parent=parent, content=text)
@@ -20,8 +20,8 @@ def detect_language(text):
     return lang_code
 
 
-def tts(text):
-    lang_code = detect_language(text)
+async def tts(text):
+    lang_code = await detect_language(text)
     voice_name = get_voice(lang_code)
     if not voice_name:
         lang_code = 'ru'
@@ -43,7 +43,7 @@ def get_voice(lang_code):
             return voice.name
 
 
-def create_mp3(text, name):
-    mp3bytes = tts(text)
-    with io.open(name, 'wb') as out:
+async def create_mp3(text, name):
+    mp3bytes = await tts(text)
+    with io.open('lavalink/outputs/'+name, 'wb') as out:
         out.write(mp3bytes)
