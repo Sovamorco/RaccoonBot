@@ -8,7 +8,7 @@ from time import time
 import discord
 import lavalink
 from discord.ext import commands
-from credentials import main_password, main_nickname, gachi_things
+from credentials import main_password, main_nickname, main_web_addr,gachi_things
 
 url_rx = re.compile('https?://(?:www\\.)?.+')
 
@@ -19,7 +19,7 @@ class Music(commands.Cog):
 
         if not hasattr(bot, 'lavalink'):
             bot.lavalink = lavalink.Client(bot.user.id)
-            bot.lavalink.add_node('dtguild.ru', 2333, main_password, 'eu', 'default-node')
+            bot.lavalink.add_node(main_web_addr, 2333, main_password, 'eu', 'default-node')
             bot.add_listener(bot.lavalink.voice_update_handler, 'on_socket_response')
 
     def cog_unload(self):
@@ -105,7 +105,6 @@ class Music(commands.Cog):
 
     @commands.command(help='Зачем', usage='?why <кол-во повторений> (Не используйте, пожалуйста)')
     async def why(self, ctx, amt: int = 1):
-        return await ctx.send('Команда временно отключена')
         player = self.bot.lavalink.players.get(ctx.guild.id)
         if (int(amt) > 20) and (ctx.author.name != main_nickname):
             return await ctx.send('Нет')
@@ -119,7 +118,6 @@ class Music(commands.Cog):
 
     @commands.command(help='Команда для преобразования текста в голос', usage='?tts <текст>')
     async def tts(self, ctx, *, text):
-        return await ctx.send('Команда временно отключена')
         player = self.bot.lavalink.players.get(ctx.guild.id)
         if not text:
             return await ctx.send('Использование: ?tts <сообщение>')
