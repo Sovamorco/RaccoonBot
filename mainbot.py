@@ -13,7 +13,7 @@ volume = 0.1
 @bot.event
 async def on_ready():
     # Смена состояния(просто ради красоты)
-    activity = discord.Streaming(name='Я живой OwO', url='https://twitch.tv/mrdandycorn',
+    activity = discord.Streaming(name='Я живой OwO| ?help', url='https://twitch.tv/mrdandycorn',
                                  timestamps={'start': time()})
     await bot.change_presence(activity=activity)
     misc_setup(bot)
