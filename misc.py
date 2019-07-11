@@ -29,6 +29,19 @@ class Misc(commands.Cog):
         except Exception as e:
             await ctx.send('Ошибка: \n {}'.format(e))
 
+    @commands.command(name='fact', aliases=['facts'], help='Команда, возвращающая рандомные факты',
+                      usage='?[fact|facts]')
+    async def facts_(self, ctx):
+        try:
+            user = ctx.author
+            with open('resources/facts.txt', 'r') as f:
+                facts = load(f)
+                fact = choice(facts)
+            embed = discord.Embed(description=fact)
+            return await ctx.send('<@!{}>'.format(user.id), embed=embed)
+        except Exception as e:
+            await ctx.send('Ошибка: \n {}'.format(e))
+
     @commands.command(name='wikia', aliases=['wiki'], help='Команда для поиска статей на Fandom',
                       usage='?[wikia|wiki] <запрос>')
     async def wikia_(self, ctx, *, query=None):
