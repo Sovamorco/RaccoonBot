@@ -5,6 +5,45 @@ from json import load
 from random import choice
 from html import unescape
 import asyncio
+from credentials import osu_key
+from enum import IntFlag
+
+
+class osumods(IntFlag):
+    NoMod = 0,
+    NF = 1,
+    EZ = 2,
+    TD = 4,
+    HD = 8,
+    HR = 16,
+    SD = 32,
+    DT = 64,
+    RX = 128,
+    HT = 256,
+    NCMask = 512,
+    NC = 576,
+    FL = 1024,
+    Auto = 2048,
+    SO = 4096,
+    AP = 8192,
+    PFMask = 16384,
+    PF = 16416,
+    Key4 = 32768,
+    Key5 = 65536,
+    Key6 = 131072,
+    Key7 = 262144,
+    Key8 = 524288,
+    FadeIn = 1048576,
+    Random = 2097152,
+    Cinema = 4194304,
+    Target = 8388608,
+    Key9 = 16777216,
+    KeyCoop = 33554432,
+    Key1 = 67108864,
+    Key3 = 134217728,
+    Key2 = 268435456,
+    ScoreV2 = 536870912,
+    LastMod = 1073741824
 
 
 class Misc(commands.Cog):
@@ -98,7 +137,7 @@ class Misc(commands.Cog):
                 'batch': 1
             }
             try:
-                result = requests.get(apiurl+'Search/List', params=params, timeout=0.5).json()
+                result = requests.get(apiurl + 'Search/List', params=params, timeout=0.5).json()
             except Exception as e:
                 await ctx.send('Ничего не найдено')
                 return print(e)
@@ -111,10 +150,10 @@ class Misc(commands.Cog):
                 'width': 200,
                 'height': 200
             }
-            result = requests.get(apiurl+'Articles/Details', params=params, timeout=0.5).json()
+            result = requests.get(apiurl + 'Articles/Details', params=params, timeout=0.5).json()
             basepath = result['basepath']
             result = result['items'][str(page_id)]
-            page_url = basepath+result['url']
+            page_url = basepath + result['url']
             title = result['title']
             desc = unescape(result['abstract'])
             dims = result['original_dimensions']
@@ -130,9 +169,9 @@ class Misc(commands.Cog):
                         'height': height
                     }
                 else:
-                    ratio = height/width
+                    ratio = height / width
                     width = 200
-                    height = ratio*width
+                    height = ratio * width
                     params = {
                         'ids': page_id,
                         'abstract': 0,
@@ -151,6 +190,74 @@ class Misc(commands.Cog):
             await ctx.send('Не удалось подключиться к Wikia')
         except Exception as e:
             await ctx.send('Ошибка: \n {}'.format(e))
+
+    @commands.command(name='osuplayer', aliases=['op'], help='Команда для получения информации о игроке osu!standart',
+                      usage='?[op|osuplayer] <ник/id>')
+    async def op_(self, ctx, *, nickname=''):
+        if not nickname:
+            return await ctx.send('Использование: ?[op|osuplayer] <ник/id>')
+        api_link = 'https://osu.ppy.sh/api/'
+        params = {
+            'k': osu_key,
+            'u': nickname
+        }
+        r = requests.get(api_link + 'get_user', params=params, timeout=2).json()
+        if not r:
+            return await ctx.send('Пользователь не найден')
+        result = r[0]
+        print(result)
+        if result['playcount'] is None:
+            return await ctx.send('Слишком мало информации по пользователю')
+        embed = discord.Embed(title=result['username'], url='https://osu.ppy.sh/users/{}'.format(result['user_id']))
+        embed.set_thumbnail(url='https://a.ppy.sh/{}'.format(result['user_id']))
+        embed.add_field(name='Rank', value='{:,}'.format(int(result['pp_rank'])))
+        embed.add_field(name='Country rank :flag_{}:'.format(result['country'].lower()),
+                        value='{:,}'.format(int(result['pp_country_rank'])))
+        embed.add_field(name='PP', value='{:,}'.format(round(float(result['pp_raw']))))
+        embed.add_field(name='Accuracy', value=str(round(float(result['accuracy']), 2)) + '%')
+        embed.add_field(name='Level', value=str(int(float(result['level']))))
+        embed.add_field(name='Play Count', value='{:,}'.format(int(result['playcount'])))
+        embed.add_field(name='Ranked Score', value='{:,}'.format(int(result['ranked_score'])))
+        embed.add_field(name='Total Score', value='{:,}'.format(int(result['total_score'])))
+        await ctx.send(embed=embed)
+
+    @commands.command(name='osuplays', aliases=['ops'], usage='?[ops|osuplays] <ник/id>',
+                      help='Команда для получения информации о лучших плеях игрока osu!standart')
+    async def ops_(self, ctx, *, nickname=''):
+        if not nickname:
+            return await ctx.send('Использование: ?[ops|osuplays] <ник/id>')
+        text_channel = ctx.message.channel
+        api_link = 'https://osu.ppy.sh/api/'
+        params = {
+            'k': osu_key,
+            'u': nickname
+        }
+        plays = requests.get(api_link + 'get_user_best', params=params, timeout=2).json()
+        if not plays:
+            return await ctx.send('Пользователь не найден')
+        embed = discord.Embed()
+        async with text_channel.typing():
+            for i in range(len(plays)):
+                params = {
+                    'k': osu_key,
+                    'b': plays[i]['beatmap_id']
+                }
+                info = requests.get(api_link + 'get_beatmaps', params=params).json()[0]
+                accuracy = round(
+                    (int(plays[i]['count300']) * 300 + int(plays[i]['count100']) * 100 + int(
+                        plays[i]['count50']) * 50) / (
+                            (int(plays[i]['count300']) + int(plays[i]['count100']) + int(plays[i]['count50'])) * 3), 2)
+                combo = '{:,} ({})'.format(int(plays[i]['maxcombo']),
+                                           'FC' if plays[i]['maxcombo'] == info['max_combo'] else info['max_combo'])
+                name = '{}. {} [{}] ({})'.format(i+1, info['title'], info['version'],
+                                                 str(osumods(int(plays[i]['enabled_mods']))).replace('osumods.', ''))
+                value = 'Score: {:,}; Combo: {}; PP: {:,}; Acc: {}%; Rank: {}'.format(int(plays[i]['score']), combo,
+                                                                                      round(float(plays[i]['pp']), 2),
+                                                                                      accuracy,
+                                                                                      plays[i]['rank'].replace('H', '',
+                                                                                                               1))
+                embed.add_field(name=name, value=value)
+        await ctx.send(embed=embed)
 
 
 def misc_setup(bot):
