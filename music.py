@@ -19,7 +19,7 @@ class Music(commands.Cog):
 
         if not hasattr(bot, 'lavalink'):
             bot.lavalink = lavalink.Client(bot.user.id)
-            bot.lavalink.add_node(main_web_addr, 2333, main_password, 'eu', 'default-node')
+            bot.lavalink.add_node('127.0.0.1', 2333, main_password, 'ru', 'default-node')
             bot.add_listener(bot.lavalink.voice_update_handler, 'on_socket_response')
 
     def cog_unload(self):
@@ -58,7 +58,7 @@ class Music(commands.Cog):
             embed.title = 'Плейлист добавлен'
             embed.description = f'{results["playlistInfo"]["name"]} - {len(tracks)}'
         else:
-            if ('youtube.com' in query) or ('youtu.be' in query):
+            if url_rx.match(query):
                 track = results['tracks'][0]
             else:
                 text_channel = ctx.message.channel
