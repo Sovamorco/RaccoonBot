@@ -50,10 +50,6 @@ class Misc(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def cog_command_error(self, ctx, error):
-        if isinstance(error, commands.CommandInvokeError):
-            await ctx.send(error.original)
-
     @commands.command(name='raccoon', aliases=['racc'], help='Команда, которая сделает вашу жизнь лучше',
                       usage='?[racc|raccoon]')
     async def raccoon_(self, ctx):
@@ -205,7 +201,6 @@ class Misc(commands.Cog):
         if not r:
             return await ctx.send('Пользователь не найден')
         result = r[0]
-        print(result)
         if result['playcount'] is None:
             return await ctx.send('Слишком мало информации по пользователю')
         embed = discord.Embed(title=result['username'], url='https://osu.ppy.sh/users/{}'.format(result['user_id']))
@@ -219,14 +214,13 @@ class Misc(commands.Cog):
         embed.add_field(name='Play Count', value='{:,}'.format(int(result['playcount'])))
         embed.add_field(name='Ranked Score', value='{:,}'.format(int(result['ranked_score'])))
         embed.add_field(name='Total Score', value='{:,}'.format(int(result['total_score'])))
-        await ctx.send(embed=embed)
+        await ctx.send('<@!{}>'.format(ctx.author.id), embed=embed)
 
     @commands.command(name='osuplays', aliases=['ops'], usage='?[ops|osuplays] <ник/id>',
                       help='Команда для получения информации о лучших плеях игрока osu!standart')
     async def ops_(self, ctx, *, nickname=''):
         if not nickname:
             return await ctx.send('Использование: ?[ops|osuplays] <ник/id>')
-        text_channel = ctx.message.channel
         api_link = 'https://osu.ppy.sh/api/'
         params = {
             'k': osu_key,
@@ -235,29 +229,30 @@ class Misc(commands.Cog):
         plays = requests.get(api_link + 'get_user_best', params=params, timeout=2).json()
         if not plays:
             return await ctx.send('Пользователь не найден')
+        embed = discord.Embed(description='Loading...')
+        msg = await ctx.send('<@!{}>'.format(ctx.author.id), embed=embed)
         embed = discord.Embed()
-        async with text_channel.typing():
-            for i in range(len(plays)):
-                params = {
-                    'k': osu_key,
-                    'b': plays[i]['beatmap_id']
-                }
-                info = requests.get(api_link + 'get_beatmaps', params=params).json()[0]
-                accuracy = round(
-                    (int(plays[i]['count300']) * 300 + int(plays[i]['count100']) * 100 + int(
-                        plays[i]['count50']) * 50) / (
-                            (int(plays[i]['count300']) + int(plays[i]['count100']) + int(plays[i]['count50'])) * 3), 2)
-                combo = '{:,} ({})'.format(int(plays[i]['maxcombo']),
-                                           'FC' if plays[i]['maxcombo'] == info['max_combo'] else info['max_combo'])
-                name = '{}. {} [{}] ({})'.format(i+1, info['title'], info['version'],
-                                                 str(osumods(int(plays[i]['enabled_mods']))).replace('osumods.', ''))
-                value = 'Score: {:,}; Combo: {}; PP: {:,}; Acc: {}%; Rank: {}'.format(int(plays[i]['score']), combo,
-                                                                                      round(float(plays[i]['pp']), 2),
-                                                                                      accuracy,
-                                                                                      plays[i]['rank'].replace('H', '',
-                                                                                                               1))
-                embed.add_field(name=name, value=value)
-        await ctx.send(embed=embed)
+        for i in range(len(plays)):
+            params = {
+                'k': osu_key,
+                'b': plays[i]['beatmap_id']
+            }
+            info = requests.get(api_link + 'get_beatmaps', params=params).json()[0]
+            accuracy = round(
+                (int(plays[i]['count300']) * 300 + int(plays[i]['count100']) * 100 + int(
+                    plays[i]['count50']) * 50) / (
+                        (int(plays[i]['count300']) + int(plays[i]['count100']) + int(plays[i]['count50'])) * 3), 2)
+            combo = '{:,} ({})'.format(int(plays[i]['maxcombo']),
+                                       'FC' if plays[i]['maxcombo'] == info['max_combo'] else info['max_combo'])
+            name = '{}. {} [{}] ({})'.format(i+1, info['title'], info['version'],
+                                             str(osumods(int(plays[i]['enabled_mods']))).replace('osumods.', ''))
+            value = 'Score: {:,}; Combo: {}; PP: {:,}; Acc: {}%; Rank: {}'.format(int(plays[i]['score']), combo,
+                                                                                  round(float(plays[i]['pp']), 2),
+                                                                                  accuracy,
+                                                                                  plays[i]['rank'].replace('H', '',
+                                                                                                           1))
+            embed.add_field(name=name, value=value)
+        await msg.edit(content='<@!{}>'.format(ctx.author.id), embed=embed)
 
 
 def misc_setup(bot):
