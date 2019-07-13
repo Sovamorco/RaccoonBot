@@ -1,6 +1,8 @@
 from check import *
 from music import *
 from misc import *
+from cookies import *
+from credentials import discord_status
 
 bot = commands.Bot(command_prefix=commands.when_mentioned_or('?'), description='Test bot')
 bot.remove_command('help')
@@ -10,14 +12,21 @@ queue_msg = ''
 volume = 0.1
 
 
+async def change_status():
+    while True:
+        # Смена состояния(просто ради красоты)
+        activity = discord.Streaming(name='?help | {}'.format(random.choice(discord_status)),
+                                     url='https://twitch.tv/mrdandycorn')
+        await bot.change_presence(activity=activity)
+        await asyncio.sleep(300)
+
+
 @bot.event
 async def on_ready():
-    # Смена состояния(просто ради красоты)
-    activity = discord.Streaming(name='Я живой OwO| ?help', url='https://twitch.tv/mrdandycorn',
-                                 timestamps={'start': time()})
-    await bot.change_presence(activity=activity)
+    bot.loop.create_task(change_status())
     misc_setup(bot)
     music_setup(bot)
+    cookies_setup(bot)
     # Проверка обновлений на сообщении, в случае, если что-то изменилось, пока бот был оффлайн
     # check()
     print('Logged on as', bot.user)
@@ -105,6 +114,7 @@ async def help_(context, request=None):
                         commandlist[cog] += ', {}'.format(command.name)
             for cog in commandlist.keys():
                 embed.add_field(name=cog, value=commandlist[cog])
+            embed.set_footer(text='Более подробно: ?help <команда>')
             return await text_channel.send(embed=embed)
         for command in bot.commands:
             if ((command.name == request.lower()) or (request.lower() in command.aliases)) and not command.hidden:
