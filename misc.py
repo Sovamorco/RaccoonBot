@@ -64,6 +64,18 @@ class Misc(commands.Cog):
         except Exception as e:
             await ctx.send('Ошибка: \n {}'.format(e))
 
+    @commands.command(name='inspirobot', aliases=['inspire'], help='Команда для генерации "воодушевляющих" картинок',
+                      usage='?[inspire|inspirobot]')
+    async def inspire_(self, ctx):
+        try:
+            user = ctx.author
+            image = requests.get('http://inspirobot.me/api?generate=true').text
+            embed = discord.Embed()
+            embed.set_image(url=image)
+            return await ctx.send('<@!{}>'.format(user.id), embed=embed)
+        except Exception as e:
+            await ctx.send('Ошибка: \n {}'.format(e))
+
     @commands.command(name='fact', aliases=['facts'], help='Команда, возвращающая рандомные факты',
                       usage='?[fact|facts]')
     async def facts_(self, ctx):

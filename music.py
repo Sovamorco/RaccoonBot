@@ -2,6 +2,7 @@ import math
 import re
 import random
 import json
+import requests
 
 from tts import *
 from time import time
@@ -88,6 +89,26 @@ class Music(commands.Cog):
             embed.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
             player.add(requester=ctx.author.id, track=track)
         await ctx.send(embed=embed)
+        if not player.is_playing:
+            await player.play()
+
+    @commands.command(aliases=['wisdom'], usage='?[mindful|wisdom]',
+                      help='Команда для проигрывания аудио, сгенерированного InspiroBot Mindful')
+    async def mindful(self, ctx):
+        player = self.bot.lavalink.players.get(ctx.guild.id)
+        session_id = requests.get('http://inspirobot.me/api?getSessionID=1').text
+        mindful = requests.get('http://inspirobot.me/api?generateFlow=1&sessionID='+session_id).json()
+        audio_url = mindful['mp3']
+        data = mindful['data']
+        text = ''
+        for item in data:
+            if item['type'] == 'quote':
+                text += '{}\n'.format(item['text'])
+        text = re.sub(r'\[([^)]+?)]', "", text)
+        results = await player.node.get_tracks(audio_url)
+        track = results['tracks'][0]
+        player.add(requester=ctx.author.id, track=track)
+        await ctx.send(text)
         if not player.is_playing:
             await player.play()
 
@@ -355,7 +376,7 @@ class Music(commands.Cog):
 
     async def ensure_voice(self, ctx):
         player = self.bot.lavalink.players.create(ctx.guild.id, endpoint=str(ctx.guild.region))
-        should_connect = ctx.command.name in ('play', 'join', 'why', 'tts', 'join', 'gachibass')
+        should_connect = ctx.command.name in ('play', 'join', 'why', 'tts', 'join', 'gachibass', 'mindful')
         if not ctx.author.voice or not ctx.author.voice.channel:
             raise commands.CommandInvokeError('Сначала подключитесь к голосовому каналу')
         if not player.is_connected:
