@@ -15,8 +15,11 @@ volume = 0.1
 async def change_status():
     while True:
         # Смена состояния(просто ради красоты)
-        activity = discord.Streaming(name='?help | {}'.format(random.choice(discord_status)),
-                                     url='https://twitch.tv/mrdandycorn')
+        if sys.gettrace() is None:
+            status = '?help | {}'.format(random.choice(discord_status))
+        else:
+            status = 'In Development'
+        activity = discord.Streaming(name=status, url='https://twitch.tv/mrdandycorn')
         await bot.change_presence(activity=activity)
         await asyncio.sleep(300)
 
@@ -24,11 +27,15 @@ async def change_status():
 @bot.event
 async def on_ready():
     bot.loop.create_task(change_status())
-    misc_setup(bot)
-    music_setup(bot)
-    cookies_setup(bot)
+    try:
+        misc_setup(bot)
+        music_setup(bot)
+        cookies_setup(bot)
+    except discord.errors.ClientException:
+        pass
     # Проверка обновлений на сообщении, в случае, если что-то изменилось, пока бот был оффлайн
-    # check()
+    if sys.gettrace() is None:
+        check()
     print('Logged on as', bot.user)
 
 

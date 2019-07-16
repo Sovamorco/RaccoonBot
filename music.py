@@ -3,13 +3,14 @@ import re
 import random
 import json
 import requests
+import sys
 
 from tts import *
 from time import time
 import discord
 import lavalink
 from discord.ext import commands
-from credentials import main_password, main_nickname, main_web_addr,gachi_things
+from credentials import main_password, main_nickname, main_web_addr, gachi_things
 
 url_rx = re.compile('https?://(?:www\\.)?.+')
 
@@ -19,8 +20,12 @@ class Music(commands.Cog):
         self.bot = bot
 
         if not hasattr(bot, 'lavalink'):
+            if sys.gettrace() is None:
+                addr = '127.0.0.1'
+            else:
+                addr = main_web_addr
             bot.lavalink = lavalink.Client(bot.user.id)
-            bot.lavalink.add_node('127.0.0.1', 2333, main_password, 'ru', 'default-node')
+            bot.lavalink.add_node(addr, 2333, main_password, 'ru', 'default-node')
             bot.add_listener(bot.lavalink.voice_update_handler, 'on_socket_response')
 
     def cog_unload(self):
@@ -36,15 +41,23 @@ class Music(commands.Cog):
 
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.CommandInvokeError):
-            await ctx.send(error.original)
+            await ctx.send('Ошибка:\n' + str(error.original))
 
     async def connect_to(self, guild_id: int, channel_id):
         ws = self.bot._connection._get_websocket(guild_id)
         await ws.voice_state(str(guild_id), channel_id)
 
     @commands.command(aliases=['p'], usage='?[p|play] <ссылка/название>', help='Команда для проигрывания музыки')
-    async def play(self, ctx, *, query: str):
+    async def play(self, ctx, *, query: str = ''):
         player = self.bot.lavalink.players.get(ctx.guild.id)
+        if not query:
+            if player.paused:
+                await player.set_pause(False)
+                return await ctx.send('⏯ | Воспроизведение возобновлено')
+            if not player.is_playing:
+                return await player.play()
+            else:
+                return await ctx.send('Использование: ?[p|play] <ссылка/название>')
         query = query.strip('<>')
         if not url_rx.match(query):
             query = f'ytsearch:{query}'
@@ -106,6 +119,8 @@ class Music(commands.Cog):
                 text += '{}\n'.format(item['text'])
         text = re.sub(r'\[([^)]+?)]', "", text)
         results = await player.node.get_tracks(audio_url)
+        if results['loadType'] != 'TRACK_LOADED':
+            return await ctx.send('Произошла ошибка. Попробуйте еще раз')
         track = results['tracks'][0]
         player.add(requester=ctx.author.id, track=track)
         await ctx.send(text)
@@ -366,17 +381,32 @@ class Music(commands.Cog):
                       help='Команда для подключения бота к голосовому каналу')
     async def join(self, ctx):
         player = self.bot.lavalink.players.get(ctx.guild.id)
-        if not ctx.author.voice:
-            return await ctx.send('Пользователь не подключен к каналу')
         if player.channel_id:
             if ctx.author.voice.channel.id == int(player.channel_id):
                 return await ctx.send('Уже подключен к голосовому каналу')
         await self.connect_to(ctx.guild.id, ctx.author.voice.channel.id)
         await ctx.send('*⃣ | Подключен к {}'.format(ctx.author.voice.channel))
 
+    @commands.command(usage='?move <название канала>',
+                      help='Команда для перемещения всех из одного канала в другой')
+    async def move(self, ctx, *, channel: str):
+        player = self.bot.lavalink.players.get(ctx.guild.id)
+        if player.channel_id:
+            if ctx.author.voice.channel.name.lower() == channel.lower():
+                return await ctx.send('Уже подключен к голосовому каналу')
+        channels = await ctx.guild.fetch_channels()
+        for ch in channels:
+            if (ch.__class__ == discord.channel.VoiceChannel) and (ch.name.lower() == channel.lower()):
+                members = ctx.author.voice.channel.members
+                for member in members:
+                    await member.move_to(ch)
+                await self.connect_to(ctx.guild.id, ch.id)
+                return await ctx.send('*⃣ | Перемещен в {}'.format(ch.name))
+        return await ctx.send('Канал с таким именем не найден')
+
     async def ensure_voice(self, ctx):
         player = self.bot.lavalink.players.create(ctx.guild.id, endpoint=str(ctx.guild.region))
-        should_connect = ctx.command.name in ('play', 'join', 'why', 'tts', 'join', 'gachibass', 'mindful')
+        should_connect = ctx.command.name in ('play', 'join', 'why', 'tts', 'join', 'gachibass', 'mindful', 'move')
         if not ctx.author.voice or not ctx.author.voice.channel:
             raise commands.CommandInvokeError('Сначала подключитесь к голосовому каналу')
         if not player.is_connected:

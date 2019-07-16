@@ -10,6 +10,9 @@ class Cookies(commands.Cog):
         self.bot = bot
         self.bot.loop.create_task(self.add_cookies())
 
+    async def cog_command_error(self, ctx, error):
+        await ctx.send('Ошибка:\n' + str(error.original))
+
     async def add_cookies(self):
         while True:
             guilds = self.bot.guilds
@@ -57,31 +60,25 @@ class Cookies(commands.Cog):
     @commands.command(name='cookies', aliases=['points'], help='Команда для отображения печенек',
                       usage='?[cookies|points]')
     async def cookies_(self, ctx):
-        try:
-            user = ctx.author
-            cookies = json.load(open('resources/cookies.json', 'r')).get(str(user.id), None)
-            if cookies is None:
-                cookies = 'нет'
-            else:
-                cookies = '{:,}'.format(cookies['cookies'])
-            return await ctx.send('У <@!{}> {} печенек'.format(user.id, cookies))
-        except Exception as e:
-            await ctx.send('Ошибка: \n {}'.format(e))
+        user = ctx.author
+        cookies = json.load(open('resources/cookies.json', 'r')).get(str(user.id), None)
+        if cookies is None:
+            cookies = 'нет'
+        else:
+            cookies = '{:,}'.format(cookies['cookies'])
+        return await ctx.send('У <@!{}> {} печенек'.format(user.id, cookies))
 
     @commands.command(name='leaderboard', aliases=['lb'], help='Команда для отображения топа печенек',
                       usage='?[lb|leaderboard]')
     async def leaderboard_(self, ctx):
-        try:
-            cookies = json.load(open('resources/cookies.json', 'r'))
-            cookies = sorted(cookies.items(), key=lambda kv: kv[1]['cookies'], reverse=True)
-            length = 10 if len(cookies) > 10 else len(cookies)
-            embedValue = ''
-            for i in range(length):
-                embedValue += '{}. {}: {:,} печенек\n\n'.format(i+1, cookies[i][1]['name'], cookies[i][1]['cookies'])
-            embed = discord.Embed(title='Топ печенек', description=embedValue)
-            return await ctx.send('<@!{}>'.format(ctx.author.id), embed=embed)
-        except Exception as e:
-            await ctx.send('Ошибка: \n {}'.format(e))
+        cookies = json.load(open('resources/cookies.json', 'r'))
+        cookies = sorted(cookies.items(), key=lambda kv: kv[1]['cookies'], reverse=True)
+        length = 10 if len(cookies) > 10 else len(cookies)
+        embedValue = ''
+        for i in range(length):
+            embedValue += '{}. {}: {:,} печенек\n\n'.format(i+1, cookies[i][1]['name'], cookies[i][1]['cookies'])
+        embed = discord.Embed(title='Топ печенек', description=embedValue)
+        return await ctx.send('<@!{}>'.format(ctx.author.id), embed=embed)
 
 
 def cookies_setup(bot):

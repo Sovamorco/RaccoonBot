@@ -20,14 +20,12 @@ class osumods(IntFlag):
     DT = 64,
     RX = 128,
     HT = 256,
-    NCMask = 512,
-    NC = 576,
+    NC = 512,
     FL = 1024,
     Auto = 2048,
     SO = 4096,
     AP = 8192,
-    PFMask = 16384,
-    PF = 16416,
+    PF = 16384,
     Key4 = 32768,
     Key5 = 65536,
     Key6 = 131072,
@@ -50,44 +48,44 @@ class Misc(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    async def cog_command_error(self, ctx, error):
+        await ctx.send('Ошибка:\n' + str(error.original))
+
     @commands.command(name='raccoon', aliases=['racc'], help='Команда, которая сделает вашу жизнь лучше',
                       usage='?[racc|raccoon]')
-    async def raccoon_(self, ctx):
-        try:
-            user = ctx.author
-            with open('resources/raccoons.txt', 'r') as f:
-                raccoons = load(f)
-                raccoon = choice(raccoons)
-            embed = discord.Embed()
-            embed.set_image(url=raccoon)
-            return await ctx.send('<@!{}>'.format(user.id), embed=embed)
-        except Exception as e:
-            await ctx.send('Ошибка: \n {}'.format(e))
+    async def raccoon_(self, ctx, *, msg=None):
+        user = ctx.author
+        if msg is None:
+            msg = user.mention
+        with open('resources/raccoons.txt', 'r') as f:
+            raccoons = load(f)
+            raccoon = choice(raccoons)
+        embed = discord.Embed()
+        embed.set_image(url=raccoon)
+        return await ctx.send(msg, embed=embed)
 
     @commands.command(name='inspirobot', aliases=['inspire'], help='Команда для генерации "воодушевляющих" картинок',
                       usage='?[inspire|inspirobot]')
-    async def inspire_(self, ctx):
-        try:
-            user = ctx.author
-            image = requests.get('http://inspirobot.me/api?generate=true').text
-            embed = discord.Embed()
-            embed.set_image(url=image)
-            return await ctx.send('<@!{}>'.format(user.id), embed=embed)
-        except Exception as e:
-            await ctx.send('Ошибка: \n {}'.format(e))
+    async def inspire_(self, ctx, *, msg=None):
+        user = ctx.author
+        if msg is None:
+            msg = user.mention
+        image = requests.get('http://inspirobot.me/api?generate=true').text
+        embed = discord.Embed()
+        embed.set_image(url=image)
+        return await ctx.send(msg, embed=embed)
 
     @commands.command(name='fact', aliases=['facts'], help='Команда, возвращающая рандомные факты',
                       usage='?[fact|facts]')
-    async def facts_(self, ctx):
-        try:
-            user = ctx.author
-            with open('resources/facts.txt', 'r') as f:
-                facts = load(f)
-                fact = choice(facts)
-            embed = discord.Embed(description=fact)
-            return await ctx.send('<@!{}>'.format(user.id), embed=embed)
-        except Exception as e:
-            await ctx.send('Ошибка: \n {}'.format(e))
+    async def facts_(self, ctx, *, msg):
+        user = ctx.author
+        if msg is None:
+            msg = user.mention
+        with open('resources/facts.txt', 'r') as f:
+            facts = load(f)
+            fact = choice(facts)
+        embed = discord.Embed(description=fact)
+        return await ctx.send(msg, embed=embed)
 
     @commands.command(name='wikia', aliases=['wiki'], help='Команда для поиска статей на Fandom',
                       usage='?[wikia|wiki] <запрос>')
@@ -121,7 +119,7 @@ class Misc(commands.Cog):
                         new_results.append(result)
             embed = discord.Embed(title='Выберите фэндом', description=embedValue)
             embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
-            choice = await ctx.send(embed=embed)
+            choicemsg = await ctx.send(embed=embed)
 
             def verify(m):
                 if m.content.isdigit():
@@ -130,9 +128,9 @@ class Misc(commands.Cog):
 
             msg = await self.bot.wait_for('message', check=verify, timeout=30)
             if int(msg.content) == 0:
-                return await choice.delete()
+                return await choicemsg.delete()
             result = new_results[int(msg.content) - 1]
-            await choice.delete()
+            await choicemsg.delete()
             if result['url'].endswith('/'):
                 apiurl = '{}api/v1/'.format(result['url'])
             else:
@@ -191,13 +189,11 @@ class Misc(commands.Cog):
             embed = discord.Embed(title=title, url=page_url, description=desc)
             if thumb is not None:
                 embed.set_thumbnail(url=thumb)
-            return await ctx.send('<@!{}>'.format(user.id), embed=embed)
+            return await ctx.send(user.mention, embed=embed)
         except asyncio.TimeoutError:
             return
         except requests.exceptions.ConnectTimeout:
             await ctx.send('Не удалось подключиться к Wikia')
-        except Exception as e:
-            await ctx.send('Ошибка: \n {}'.format(e))
 
     @commands.command(name='osuplayer', aliases=['op'], help='Команда для получения информации о игроке osu!standart',
                       usage='?[op|osuplayer] <ник/id>')
@@ -226,7 +222,7 @@ class Misc(commands.Cog):
         embed.add_field(name='Play Count', value='{:,}'.format(int(result['playcount'])))
         embed.add_field(name='Ranked Score', value='{:,}'.format(int(result['ranked_score'])))
         embed.add_field(name='Total Score', value='{:,}'.format(int(result['total_score'])))
-        await ctx.send('<@!{}>'.format(ctx.author.id), embed=embed)
+        await ctx.send(ctx.author.mention, embed=embed)
 
     @commands.command(name='osuplays', aliases=['ops'], usage='?[ops|osuplays] <ник/id>',
                       help='Команда для получения информации о лучших плеях игрока osu!standart')
@@ -242,7 +238,7 @@ class Misc(commands.Cog):
         if not plays:
             return await ctx.send('Пользователь не найден')
         embed = discord.Embed(description='Loading...')
-        msg = await ctx.send('<@!{}>'.format(ctx.author.id), embed=embed)
+        msg = await ctx.send(ctx.author.mention, embed=embed)
         embed = discord.Embed()
         for i in range(len(plays)):
             params = {
@@ -256,15 +252,19 @@ class Misc(commands.Cog):
                         (int(plays[i]['count300']) + int(plays[i]['count100']) + int(plays[i]['count50'])) * 3), 2)
             combo = '{:,} ({})'.format(int(plays[i]['maxcombo']),
                                        'FC' if plays[i]['maxcombo'] == info['max_combo'] else info['max_combo'])
-            name = '{}. {} [{}] ({})'.format(i+1, info['title'], info['version'],
-                                             str(osumods(int(plays[i]['enabled_mods']))).replace('osumods.', ''))
+            mods = str(osumods(int(plays[i]['enabled_mods']))).replace('osumods.', '', 1)
+            if 'NC' in mods:
+                mods = mods.replace('|DT', '')
+            if 'PF' in mods:
+                mods = mods.replace('|SD', '')
+            name = '{}. {} [{}] ({})'.format(i + 1, info['title'], info['version'], mods)
             value = 'Score: {:,}; Combo: {}; PP: {:,}; Acc: {}%; Rank: {}'.format(int(plays[i]['score']), combo,
                                                                                   round(float(plays[i]['pp']), 2),
                                                                                   accuracy,
                                                                                   plays[i]['rank'].replace('H', '',
                                                                                                            1))
             embed.add_field(name=name, value=value)
-        await msg.edit(content='<@!{}>'.format(ctx.author.id), embed=embed)
+        await msg.edit(content=ctx.author.mention, embed=embed)
 
 
 def misc_setup(bot):
