@@ -127,19 +127,23 @@ class Music(commands.Cog):
         if not player.is_playing:
             await player.play()
 
-    @commands.command(usage='?[gachi|gachibass]', help='Команда для проигрывания правильных версий музыки',
+    @commands.command(usage='?[gachi|gachibass] [кол-во]', help='Команда для проигрывания правильных версий музыки',
                       aliases=['gachi'])
-    async def gachibass(self, ctx):
+    async def gachibass(self, ctx, amt: int = 1):
+        if amt > 100:
+            return await ctx.send('Нет')
         player = self.bot.lavalink.players.get(ctx.guild.id)
         with open('resources/gachi.txt', 'r') as f:
             tracks = json.load(f)
-        track = random.choice(tracks)
-        player.add(requester=ctx.author.id, track=track)
+        tracks = random.sample(tracks, amt)
+        player.add(requester=ctx.author.id, track=tracks.pop(0))
         await ctx.send(random.choice(gachi_things))
         if not player.is_playing:
             await player.play()
+        for track in tracks:
+            player.add(requester=ctx.author.id, track=track)
 
-    @commands.command(help='Зачем', usage='?why <кол-во повторений> (Не используйте, пожалуйста)')
+    @commands.command(help='Зачем', usage='?why [кол-во]\n(Не используйте, пожалуйста)')
     async def why(self, ctx, amt: int = 1):
         player = self.bot.lavalink.players.get(ctx.guild.id)
         if (int(amt) > 20) and (ctx.author.name != main_nickname):
@@ -184,7 +188,13 @@ class Music(commands.Cog):
             return await ctx.send('Ничего не играет')
 
         await player.skip()
-        await ctx.send('⏭ | Трек пропущен')
+        track = ''
+        if player.queue:
+            while not player.is_playing:
+                pass
+            cur = player.current
+            track = '\nДальше: {}'.format(cur.title if not cur.title == 'Unknown title' else cur.identifier)
+        await ctx.send('⏭ | Трек пропущен' + track)
 
     @commands.command(help='Команда для остановки плеера и очистки очереди', usage='?stop')
     async def stop(self, ctx):
@@ -225,8 +235,8 @@ class Music(commands.Cog):
                               title='Сейчас играет', description=song)
         await ctx.send(embed=embed)
 
-    @commands.command(aliases=['q'], help='Команда для отображения очереди воспроизведения',
-                      usage='?[q|queue]')
+    @commands.command(aliases=['q', 'list'], help='Команда для отображения очереди воспроизведения',
+                      usage='?[q|queue|list]')
     async def queue(self, ctx):
         player = self.bot.lavalink.players.get(ctx.guild.id)
         if not player.queue:
@@ -386,23 +396,6 @@ class Music(commands.Cog):
                 return await ctx.send('Уже подключен к голосовому каналу')
         await self.connect_to(ctx.guild.id, ctx.author.voice.channel.id)
         await ctx.send('*⃣ | Подключен к {}'.format(ctx.author.voice.channel))
-
-    @commands.command(usage='?move <название канала>',
-                      help='Команда для перемещения всех из одного канала в другой')
-    async def move(self, ctx, *, channel: str):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
-        if player.channel_id:
-            if ctx.author.voice.channel.name.lower() == channel.lower():
-                return await ctx.send('Уже подключен к голосовому каналу')
-        channels = await ctx.guild.fetch_channels()
-        for ch in channels:
-            if (ch.__class__ == discord.channel.VoiceChannel) and (ch.name.lower() == channel.lower()):
-                members = ctx.author.voice.channel.members
-                for member in members:
-                    await member.move_to(ch)
-                await self.connect_to(ctx.guild.id, ch.id)
-                return await ctx.send('*⃣ | Перемещен в {}'.format(ch.name))
-        return await ctx.send('Канал с таким именем не найден')
 
     async def ensure_voice(self, ctx):
         player = self.bot.lavalink.players.create(ctx.guild.id, endpoint=str(ctx.guild.region))

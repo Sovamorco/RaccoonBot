@@ -1,6 +1,7 @@
 from check import *
 from music import *
 from misc import *
+from shadowverse import *
 from cookies import *
 from credentials import discord_status
 
@@ -31,6 +32,7 @@ async def on_ready():
         misc_setup(bot)
         music_setup(bot)
         cookies_setup(bot)
+        sv_setup(bot)
     except discord.errors.ClientException:
         pass
     # Проверка обновлений на сообщении, в случае, если что-то изменилось, пока бот был оффлайн

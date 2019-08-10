@@ -266,6 +266,35 @@ class Misc(commands.Cog):
             embed.add_field(name=name, value=value)
         await msg.edit(content=ctx.author.mention, embed=embed)
 
+    @commands.command(name='link', usage='?link [канал]', help='Команда для генерации ссылки для создания видеозвонка'
+                                                               'из голосового канала')
+    async def link_(self, ctx, *, channel=None):
+        if channel is None:
+            if not ctx.author.voice or not ctx.author.voice.channel:
+                return await ctx.send('Сначала подключитесь к голосовому каналу')
+            channel = ctx.author.voice.channel.name
+        channels = await ctx.guild.fetch_channels()
+        for ch in channels:
+            if (ch.__class__ == discord.channel.VoiceChannel) and (ch.name.lower() == channel.lower()):
+                link = 'https://discordapp.com/channels/{}/{}'.format(ctx.guild.id, ch.id)
+                embed = discord.Embed(description='[Магическая ссылка для канала {}]({})'.format(ch.name, link))
+                return await ctx.send(embed=embed)
+        return await ctx.send('Канал с таким именем не найден')
+
+    @commands.command(usage='?move <название канала>',
+                      help='Команда для перемещения всех из одного канала в другой')
+    async def move(self, ctx, *, channel: str):
+        if ctx.author.voice.channel.name.lower() == channel.lower():
+            return await ctx.send('Уже подключен к голосовому каналу')
+        channels = await ctx.guild.fetch_channels()
+        for ch in channels:
+            if (ch.__class__ == discord.channel.VoiceChannel) and (ch.name.lower() == channel.lower()):
+                members = ctx.author.voice.channel.members
+                for member in members:
+                    await member.move_to(ch)
+                return await ctx.send('*⃣ | Перемещен в {}'.format(ch.name))
+        return await ctx.send('Канал с таким именем не найден')
+
 
 def misc_setup(bot):
     bot.add_cog(Misc(bot))
