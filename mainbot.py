@@ -5,12 +5,8 @@ from shadowverse import *
 from cookies import *
 from credentials import discord_status
 
-bot = commands.Bot(command_prefix=commands.when_mentioned_or('?'), description='Test bot')
+bot = commands.Bot(command_prefix=commands.when_mentioned_or('?'), description='Cutest bot on Discord (subjective)')
 bot.remove_command('help')
-
-queue_exists = False
-queue_msg = ''
-volume = 0.1
 
 
 async def change_status():

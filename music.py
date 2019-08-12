@@ -10,7 +10,8 @@ from time import time
 import discord
 import lavalink
 from discord.ext import commands
-from credentials import main_password, main_nickname, main_web_addr, gachi_things
+from bs4 import BeautifulSoup
+from credentials import main_password, main_nickname, main_web_addr, gachi_things, genius_token
 
 url_rx = re.compile('https?://(?:www\\.)?.+')
 
@@ -234,6 +235,57 @@ class Music(commands.Cog):
         embed = discord.Embed(color=discord.Color.blurple(),
                               title='Сейчас играет', description=song)
         await ctx.send(embed=embed)
+
+    @commands.command(aliases=['nl', 'npl', 'cl'], usage='?[nl|npl|cl|currentlyrics]',
+                      help='Команда для отображения текста текущего трека')
+    async def currentlyrics(self, ctx):
+        player = self.bot.lavalink.players.get(ctx.guild.id)
+        if not player.current:
+            return await ctx.send('Ничего не играет')
+        title = player.current.title
+        ftitle = re.sub(r'\[([^)]+?)]', '', re.sub(r'\(([^)]+?)\)', '', title.lower())).replace('lyric video', '').replace('lyrics', '')
+        params = {
+            'q': ftitle
+        }
+        headers = {
+            'Authorization': 'Bearer ' + genius_token
+        }
+        req = requests.get('https://api.genius.com/search', params=params, headers=headers)
+        result = req.json()['response']['hits']
+        if len(result) == 0:
+            return await ctx.send('Песня не найдена')
+        else:
+            result = result[0]
+            if result['type'] == 'song':
+                if result['result']['lyrics_state'] == 'complete':
+                    url = result['result']['url']
+                    lyrics = requests.get(url)
+                    soup = BeautifulSoup(lyrics.text, 'html.parser')
+                    lyrics = soup.p.get_text()
+                    if len(lyrics) > 2000:
+                        lyrlist = lyrics.split('\n')
+                        lyrics = ''
+                        it = 1
+                        for i in range(len(lyrlist)):
+                            lyrics += lyrlist[i] + '\n'
+                            if i < len(lyrlist) - 1 and len(lyrics + lyrlist[i + 1]) > 2000:
+                                embed = discord.Embed(color=discord.Color.blurple(),
+                                                      title='Текст {} ({})'.format(title, it), description=lyrics)
+                                await ctx.send(embed=embed)
+                                lyrics = ''
+                                it += 1
+                            elif i == len(lyrlist) - 1:
+                                embed = discord.Embed(color=discord.Color.blurple(),
+                                                      title='Текст {} ({})'.format(title, it), description=lyrics)
+                                return await ctx.send(embed=embed)
+                    else:
+                        embed = discord.Embed(color=discord.Color.blurple(),
+                                              title='Текст '+title, description=lyrics)
+                        return await ctx.send(embed=embed)
+                else:
+                    return await ctx.send('Текст песни не найден')
+            else:
+                return await ctx.send('Текст песни не найден')
 
     @commands.command(aliases=['q', 'list'], help='Команда для отображения очереди воспроизведения',
                       usage='?[q|queue|list]')

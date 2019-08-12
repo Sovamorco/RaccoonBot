@@ -5,8 +5,10 @@ from json import load
 from random import choice
 from html import unescape
 import asyncio
-from credentials import osu_key
+from credentials import osu_key, genius_token
 from enum import IntFlag
+from bs4 import BeautifulSoup
+import re
 
 
 class osumods(IntFlag):
@@ -123,7 +125,7 @@ class Misc(commands.Cog):
 
             def verify(m):
                 if m.content.isdigit():
-                    return (0 <= int(m.content) <= len(results)) and (m.channel == text_channel) and (m.author == user)
+                    return (0 <= int(m.content) <= len(new_results)) and (m.channel == text_channel) and (m.author == user)
                 return False
 
             msg = await self.bot.wait_for('message', check=verify, timeout=30)
@@ -194,6 +196,73 @@ class Misc(commands.Cog):
             return
         except requests.exceptions.ConnectTimeout:
             await ctx.send('Не удалось подключиться к Wikia')
+
+    @commands.command(aliases=['l'], usage='?[l|lyrics] <запрос>',
+                      help='Команда для отображения текста текущего трека')
+    async def lyrics(self, ctx, *, title):
+        text_channel = ctx.message.channel
+        user = ctx.message.author
+        ftitle = re.sub(r'\[([^)]+?)]', '', re.sub(r'\(([^)]+?)\)', '', title.lower()))
+        params = {
+            'q': ftitle
+        }
+        headers = {
+            'Authorization': 'Bearer ' + genius_token
+        }
+        req = requests.get('https://api.genius.com/search', params=params, headers=headers)
+        r = req.json()['response']['hits']
+        if len(r) == 0:
+            return await ctx.send('Песни не найдены')
+        else:
+            new_results = []
+            embedValue = ''
+            i = 0
+            for result in r:
+                if result['type'] == 'song' and result['result']['lyrics_state'] == 'complete':
+                    i += 1
+                    embedValue += '{}. {} - {}\n'.format(i, result['result']['primary_artist']['name'],
+                                                         result['result']['title'])
+                    new_results.append(result)
+
+            embed = discord.Embed(title='Выберите трек', description=embedValue)
+            embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
+            choicemsg = await ctx.send(embed=embed)
+
+            def verify(m):
+                if m.content.isdigit():
+                    return (0 <= int(m.content) <= len(new_results)) and (m.channel == text_channel) and (
+                                m.author == user)
+                return False
+
+            msg = await self.bot.wait_for('message', check=verify, timeout=30)
+            if int(msg.content) == 0:
+                return await choicemsg.delete()
+            result = new_results[int(msg.content) - 1]
+            url = result['result']['url']
+            title = '{} - {}'.format(result['result']['primary_artist']['name'], result['result']['title'])
+            lyrics = requests.get(url)
+            soup = BeautifulSoup(lyrics.text, 'html.parser')
+            lyrics = soup.p.get_text()
+            if len(lyrics) > 2000:
+                lyrlist = lyrics.split('\n')
+                lyrics = ''
+                it = 1
+                for i in range(len(lyrlist)):
+                    lyrics += lyrlist[i] + '\n'
+                    if i < len(lyrlist) - 1 and len(lyrics + lyrlist[i + 1]) > 2000:
+                        embed = discord.Embed(color=discord.Color.blurple(),
+                                              title='Текст {} ({})'.format(title, it), description=lyrics)
+                        await ctx.send(embed=embed)
+                        lyrics = ''
+                        it += 1
+                    elif i == len(lyrlist) - 1:
+                        embed = discord.Embed(color=discord.Color.blurple(),
+                                              title='Текст {} ({})'.format(title, it), description=lyrics)
+                        return await ctx.send(embed=embed)
+            else:
+                embed = discord.Embed(color=discord.Color.blurple(),
+                                      title='Текст ' + title, description=lyrics)
+                return await ctx.send(embed=embed)
 
     @commands.command(name='osuplayer', aliases=['op'], help='Команда для получения информации о игроке osu!standart',
                       usage='?[op|osuplayer] <ник/id>')
