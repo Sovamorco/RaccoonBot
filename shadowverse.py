@@ -13,7 +13,8 @@ class Shadowverse(commands.Cog):
             self.cards = requests.get('https://sv.bagoum.com/cardsFullJSON').json()
 
     async def cog_command_error(self, ctx, error):
-        await ctx.send('Ошибка:\n' + str(error.original))
+        if isinstance(error, commands.CommandInvokeError) and str(error.original):
+            await ctx.send('Ошибка:\n' + str(error.original))
 
     @commands.command(name='svcard', help='Команда для поиска карты из Shadowverse',
                       usage='?svcard <запрос>')
@@ -44,13 +45,20 @@ class Shadowverse(commands.Cog):
                 embed = discord.Embed(title='Выберите карту', description=content)
                 embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
                 choice = await ctx.send(embed=embed)
+                canc = False
 
                 def verify(m):
+                    nonlocal canc
                     if m.content.isdigit():
-                        return (0 <= int(m.content) <= len(results)) and (m.channel == text_channel) and (m.author == user)
-                    return False
+                        return (0 <= int(m.content) <= len(results)) and (m.channel == text_channel) and (
+                                m.author == user)
+                    canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith('?')) and len(
+                        m.content) > 1
+                    return canc
 
                 msg = await self.bot.wait_for('message', check=verify, timeout=30)
+                if canc:
+                    return
                 if int(msg.content) == 0:
                     return await choice.delete()
                 result = results[int(msg.content)-1]
@@ -106,14 +114,19 @@ class Shadowverse(commands.Cog):
                 embed = discord.Embed(title='Выберите карту', description=content)
                 embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
                 choice = await ctx.send(embed=embed)
+                canc = False
 
                 def verify(m):
+                    nonlocal canc
                     if m.content.isdigit():
                         return (0 <= int(m.content) <= len(results)) and (m.channel == text_channel) and (
                                     m.author == user)
-                    return False
+                    canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith('?')) and len(m.content) > 1
+                    return canc
 
                 msg = await self.bot.wait_for('message', check=verify, timeout=30)
+                if canc:
+                    return
                 if int(msg.content) == 0:
                     return await choice.delete()
                 result = results[int(msg.content) - 1]

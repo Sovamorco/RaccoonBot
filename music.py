@@ -11,6 +11,7 @@ import discord
 import lavalink
 from discord.ext import commands
 from bs4 import BeautifulSoup
+from utils import form
 from credentials import main_password, main_nickname, main_web_addr, gachi_things, genius_token
 
 url_rx = re.compile('https?://(?:www\\.)?.+')
@@ -41,7 +42,7 @@ class Music(commands.Cog):
         return guild_check
 
     async def cog_command_error(self, ctx, error):
-        if isinstance(error, commands.CommandInvokeError):
+        if isinstance(error, commands.CommandInvokeError) and str(error.original):
             await ctx.send('Ошибка:\n' + str(error.original))
 
     async def connect_to(self, guild_id: int, channel_id):
@@ -71,7 +72,7 @@ class Music(commands.Cog):
             for track in tracks:
                 player.add(requester=ctx.author.id, track=track)
             embed.title = 'Плейлист добавлен'
-            embed.description = f'{results["playlistInfo"]["name"]} - {len(tracks)}'
+            embed.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} {form(len(tracks), ["трек", "трека", "треков"])}'
         else:
             if url_rx.match(query):
                 track = results['tracks'][0]
@@ -84,17 +85,23 @@ class Music(commands.Cog):
                 for i in range(length):
                     title = tracks[i]['info']['title']
                     embedValue += '{}: {}\n'.format(i + 1, title)
-                choiceEmbed = discord.Embed(title="Выберите песню", description=embedValue,
+                choiceEmbed = discord.Embed(title="Выберите трек", description=embedValue,
                                             color=discord.Color.blurple())
                 choiceEmbed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
                 choice = await ctx.send(embed=choiceEmbed, delete_after=30)
+                canc = False
 
                 def verify(m):
+                    nonlocal canc
                     if m.content.isdigit():
                         return (0 <= int(m.content) < 11) and (m.channel == text_channel) and (m.author == user)
-                    return False
+                    canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith('?')) and len(
+                        m.content) > 1
+                    return canc
 
                 msg = await self.bot.wait_for('message', check=verify, timeout=30)
+                if canc:
+                    return
                 if int(msg.content) == 0:
                     return await choice.delete()
                 track = tracks[int(msg.content) - 1]
@@ -243,7 +250,7 @@ class Music(commands.Cog):
         if not player.current:
             return await ctx.send('Ничего не играет')
         title = player.current.title
-        ftitle = re.sub(r'\[([^)]+?)]', '', re.sub(r'\(([^)]+?)\)', '', title.lower())).replace('lyric video', '').replace('lyrics', '')
+        ftitle = re.sub(r'\[([^)]+?)]', '', re.sub(r'\(([^)]+?)\)', '', title.lower())).replace('lyric video', '').replace('lyrics video', '').replace('lyrics', '')
         params = {
             'q': ftitle
         }
@@ -259,9 +266,12 @@ class Music(commands.Cog):
             if result['type'] == 'song':
                 if result['result']['lyrics_state'] == 'complete':
                     url = result['result']['url']
+                    title = '{} - {}'.format(result['result']['primary_artist']['name'], result['result']['title'])
                     lyrics = requests.get(url)
                     soup = BeautifulSoup(lyrics.text, 'html.parser')
                     lyrics = soup.p.get_text()
+                    if len(lyrics) > 4000:
+                        return await ctx.send('Слишком длинный текст, скорее всего это не текст песни')
                     if len(lyrics) > 2000:
                         lyrlist = lyrics.split('\n')
                         lyrics = ''
@@ -300,7 +310,7 @@ class Music(commands.Cog):
         for index, track in enumerate(local_queue[0:10], start=0):
             queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
         embed = discord.Embed(colour=discord.Color.blurple(),
-                              description=f'**{len(player.queue)} tracks**\n\n{queue_list}')
+                              description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
         msg = await ctx.send(embed=embed)
         if pages > 1:
             def verify(react, member):
@@ -320,7 +330,7 @@ class Music(commands.Cog):
                     for index, track in enumerate(local_queue[start:end], start=start):
                         queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
                     embed = discord.Embed(colour=discord.Color.blurple(),
-                                          description=f'**{len(player.queue)} tracks**\n\n{queue_list}')
+                                          description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
                     await msg.edit(embed=embed)
                     await msg.clear_reactions()
                     await msg.add_reaction('⏮')
@@ -337,7 +347,7 @@ class Music(commands.Cog):
                     for index, track in enumerate(local_queue[start:end], start=start):
                         queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
                     embed = discord.Embed(colour=discord.Color.blurple(),
-                                          description=f'**{len(player.queue)} tracks**\n\n{queue_list}')
+                                          description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
                     await msg.edit(embed=embed)
                     await msg.clear_reactions()
                     await msg.add_reaction('⏮')
@@ -351,7 +361,7 @@ class Music(commands.Cog):
                     for index, track in enumerate(local_queue[start:end], start=start):
                         queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
                     embed = discord.Embed(colour=discord.Color.blurple(),
-                                          description=f'**{len(player.queue)} tracks**\n\n{queue_list}')
+                                          description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
                     await msg.edit(embed=embed)
                     await msg.clear_reactions()
                     if page != 1:
@@ -368,7 +378,7 @@ class Music(commands.Cog):
                     for index, track in enumerate(local_queue[start:end], start=start):
                         queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
                     embed = discord.Embed(colour=discord.Color.blurple(),
-                                          description=f'**{len(player.queue)} tracks**\n\n{queue_list}')
+                                          description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
                     await msg.edit(embed=embed)
                     await msg.clear_reactions()
                     await msg.add_reaction('▶')
@@ -453,13 +463,13 @@ class Music(commands.Cog):
         player = self.bot.lavalink.players.create(ctx.guild.id, endpoint=str(ctx.guild.region))
         should_connect = ctx.command.name in ('play', 'join', 'why', 'tts', 'join', 'gachibass', 'mindful', 'move')
         if not ctx.author.voice or not ctx.author.voice.channel:
-            raise commands.CommandInvokeError('Сначала подключитесь к голосовому каналу')
+            return await ctx.send('Сначала подключитесь к голосовому каналу')
         if not player.is_connected:
             if not should_connect:
-                raise commands.CommandInvokeError('Я не подключен к каналу')
+                return await ctx.send('Я не подключен к каналу')
             permissions = ctx.author.voice.channel.permissions_for(ctx.me)
             if not permissions.connect or not permissions.speak:
-                raise commands.CommandInvokeError('I need the `CONNECT` and `SPEAK` permissions.')
+                return await ctx.send('I need the `CONNECT` and `SPEAK` permissions.')
             player.store('channel', ctx.channel.id)
             await self.connect_to(ctx.guild.id, str(ctx.author.voice.channel.id))
         else:
@@ -468,7 +478,7 @@ class Music(commands.Cog):
             if should_connect:
                 return await self.connect_to(ctx.guild.id, str(ctx.author.voice.channel.id))
             if int(player.channel_id) != ctx.author.voice.channel.id:
-                raise commands.CommandInvokeError('Мы в разных голосовых каналах')
+                return await ctx.send('Мы в разных голосовых каналах')
 
 
 def music_setup(bot):

@@ -1,3 +1,4 @@
+from utils import form
 from discord.ext import commands
 import discord
 import json
@@ -11,7 +12,8 @@ class Cookies(commands.Cog):
         self.bot.loop.create_task(self.add_cookies())
 
     async def cog_command_error(self, ctx, error):
-        await ctx.send('Ошибка:\n' + str(error.original))
+        if isinstance(error, commands.CommandInvokeError) and str(error.original):
+            await ctx.send('Ошибка:\n' + str(error.original))
 
     async def add_cookies(self):
         while True:
@@ -63,10 +65,10 @@ class Cookies(commands.Cog):
         user = ctx.author
         cookies = json.load(open('resources/cookies.json', 'r')).get(str(user.id), None)
         if cookies is None:
-            cookies = 'нет'
+            return await ctx.send('У {} нет печенек'.format(user.mention))
         else:
-            cookies = '{:,}'.format(cookies['cookies'])
-        return await ctx.send('У <@!{}> {} печенек'.format(user.id, cookies))
+            cookies = cookies['cookies']
+        return await ctx.send('У {} {:,} {}'.format(user.mention, cookies, form(cookies, ['печенька', 'печеньки', 'печенек'])))
 
     @commands.command(name='leaderboard', aliases=['lb'], help='Команда для отображения топа печенек',
                       usage='?[lb|leaderboard]')
@@ -76,9 +78,10 @@ class Cookies(commands.Cog):
         length = 10 if len(cookies) > 10 else len(cookies)
         embedValue = ''
         for i in range(length):
-            embedValue += '{}. {}: {:,} печенек\n\n'.format(i+1, cookies[i][1]['name'], cookies[i][1]['cookies'])
+            amt = cookies[i][1]['cookies']
+            embedValue += '{}. {}: {:,} {}\n\n'.format(i+1, cookies[i][1]['name'], amt, form(amt, ['печенька', 'печеньки', 'печенек']))
         embed = discord.Embed(title='Топ печенек', description=embedValue)
-        return await ctx.send('<@!{}>'.format(ctx.author.id), embed=embed)
+        return await ctx.send('{}'.format(ctx.author.mention), embed=embed)
 
 
 def cookies_setup(bot):
