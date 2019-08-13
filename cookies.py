@@ -125,8 +125,10 @@ class Cookies(commands.Cog):
             return await ctx.send('У вас недостаточно печенек ({:,}, а необходимо {:,})'.format(cookies, amt))
         deck = gen_deck()
         add(user.id, -1 * amt)
+        cookies = get_cookies(user.id)
         fst, snd, trd, frt = draw(deck), draw(deck), draw(deck), draw(deck)
         hand = [fst[1], trd[1]]
+        split = [hand]
         dealer = [snd[1], frt[1]]
         embedValue = '''
         Дилер выдает вам {}
@@ -135,7 +137,7 @@ class Cookies(commands.Cog):
         Дилер берет в закрытую'''.format(fst[0], snd[0], trd[0])
         embed = discord.Embed(title='Ход игры', description=embedValue)
         msg = await ctx.send(embed=embed)
-        if sum(hand) == 21:
+        if sum(split[0]) == 21:
             add(user.id, amt * 2)
             cookies = get_cookies(user.id)
             embed.description += '\n\nУ вас блэкджек, вы выиграли\nТеперь у вас {:,} {}'.format(cookies, form(cookies, [
@@ -148,38 +150,85 @@ class Cookies(commands.Cog):
 
         def verify(m):
             if m.content.lower() in ['hit', 'stand']:
-                return m.author == user, m.channel == ctx.message.channel
+                return m.author == user and m.channel == ctx.message.channel
+            if m.content.lower() == 'dd' and cookies >= amt:
+                return m.author == user and m.channel == ctx.message.channel
             return False
 
-        while True:
-            embed.description += '''
-            
-            Сумма карт у вас в руке - {}
-            Хотите взять карту?
-            (hit - взять, stand - пас)
-            Автоматическая отмена через 300 секунд'''.format(sum(hand))
-            await msg.edit(embed=embed)
-            response = await self.bot.wait_for('message', check=verify, timeout=300)
-            if response.content.lower() == 'hit':
-                new = draw(deck)
-                hand.append(new[1])
-                embed.description += '\n\nВы взяли {}'.format(new[0])
-                if sum(hand) == 21:
-                    embed.description += '\n\nУ вас 21 очко!'
-                    await msg.edit(embed=embed)
-                    break
-                if sum(hand) > 21:
-                    if 11 in hand:
-                        hand[hand.index(11)] = 1
-                        await msg.edit(embed=embed)
-                    else:
-                        cookies = get_cookies(user.id)
-                        embed.description += '\n\nУ вас больше 21 очка, вы проиграли\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
-                        return await msg.edit(embed=embed)
-            if response.content.lower() == 'stand':
-                embed.description += '\n\nВы оставили текущую руку\nСумма карт у вас в руке - {}'.format(sum(hand))
-                break
+        def versplit(m):
+            if m.content.lower() in ['да', 'нет']:
+                return m.author == user and m.channel == ctx.message.channel
+            return False
 
+        if split[0][0] == split[0][1] and cookies >= amt:
+            embed.description += '\n\nХотите разделить руку? (да/нет)\nАвтоматическая отмена через 300 секунд'
+            await msg.edit(embed=embed)
+            response = await self.bot.wait_for('message', check=versplit, timeout=300)
+            if response.content.lower() == 'да':
+                split = ([hand[0]], [hand[1]])
+                add(user.id, -1*amt)
+                spamt = [amt] * 2
+        num = 0
+        snum = ''
+        for hand in split:
+            if len(split) == 2:
+                num += 1
+                snum = ' '+str(num)
+            while True:
+                embed.description += '''
+                
+                Сумма карт у вас в руке{} - {}
+                Хотите взять карту?
+                (hit - взять, stand - пас)'''.format(snum, sum(hand))
+                cookies = get_cookies(user.id)
+                if cookies >= amt:
+                    embed.description += '\nВы можете удвоить ставку (dd)'
+                embed.description += '\nАвтоматическая отмена через 300 секунд'
+                await msg.edit(embed=embed)
+                response = await self.bot.wait_for('message', check=verify, timeout=300)
+                if response.content.lower() == 'hit':
+                    new = draw(deck)
+                    hand.append(new[1])
+                    embed.description += '\n\nВы взяли {}'.format(new[0])
+                    if sum(hand) == 21:
+                        embed.description += '\n\nУ вас 21 очко!'
+                        await msg.edit(embed=embed)
+                        break
+                    if sum(hand) > 21:
+                        if 11 in hand:
+                            hand[hand.index(11)] = 1
+                            await msg.edit(embed=embed)
+                        else:
+                            cookies = get_cookies(user.id)
+                            embed.description += '\n\nУ вас больше 21 очка, вы проиграли\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
+                            return await msg.edit(embed=embed)
+                if response.content.lower() == 'dd':
+                    add(user.id, -1*amt)
+                    if len(split) == 2:
+                        spamt[num-1] *= 2
+                    else:
+                        amt *= 2
+                    embed.description += '\n\nВы удвоили ставку'
+                    new = draw(deck)
+                    hand.append(new[1])
+                    embed.description += '\nВы взяли {}'.format(new[0])
+                    if sum(hand) == 21:
+                        embed.description += '\n\nУ вас 21 очко!'
+                        await msg.edit(embed=embed)
+                        break
+                    if sum(hand) > 21:
+                        if 11 in hand:
+                            hand[hand.index(11)] = 1
+                            await msg.edit(embed=embed)
+                        else:
+                            cookies = get_cookies(user.id)
+                            embed.description += '\n\nУ вас больше 21 очка, вы проиграли\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
+                            return await msg.edit(embed=embed)
+                    embed.description += '\nСумма карт у вас в руке{} - {}'.format(snum, sum(hand))
+                    break
+                if response.content.lower() == 'stand':
+                    embed.description += '\n\nВы оставили текущую руку\nСумма карт у вас в руке{} - {}'.format(snum, sum(hand))
+                    break
         embed.description += '\n\nДилер открывает вторую карту - {}\n'.format(frt[0])
         await msg.edit(embed=embed)
         while sum(dealer) < 18:
@@ -192,24 +241,41 @@ class Cookies(commands.Cog):
                     dealer[dealer.index(11)] = 1
                     await msg.edit(embed=embed)
                 else:
-                    add(user.id, amt * 2)
+                    if len(split) == 2:
+                        for i in range(len(split)):
+                            if sum(split[i]) <= 21:
+                                add(user.id, spamt[i] * 2)
+                    else:
+                        add(user.id, amt)
                     cookies = get_cookies(user.id)
                     embed.description += '\nУ дилера больше 21 очка, вы победили\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
                     return await msg.edit(embed=embed)
         embed.description += '\nСумма карт в руке в дилера - {}'.format(sum(dealer))
-        if sum(dealer) == sum(hand):
-            cookies = get_cookies(user.id)
-            embed.description += '\nУ вас одинаковый счет, вам возвращена ставка\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
-            add(user.id, amt)
-            return await msg.edit(embed=embed)
-        if sum(dealer) > sum(hand):
-            cookies = get_cookies(user.id)
-            embed.description += '\nУ вас меньше очков, чем у дилера\nВы проиграли\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
-            return await msg.edit(embed=embed)
-        add(user.id, amt * 2)
-        cookies = get_cookies(user.id)
-        embed.description += '\nУ вас больше очков, чем у дилера\nВы победили\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
-        return await msg.edit(embed=embed)
+        num = 0
+        for hand in split:
+            if len(split) == 2:
+                num += 1
+            if sum(hand) <= 21:
+                if len(split) == 2:
+                    embed.description += '\n\nРука {}'.format(num)
+                    amt = spamt[num-1]
+                if sum(dealer) == sum(hand):
+                    add(user.id, amt)
+                    cookies = get_cookies(user.id)
+                    embed.description += '\nУ вас одинаковый счет, вам возвращена ставка\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
+                    await msg.edit(embed=embed)
+                if sum(dealer) > sum(hand):
+                    cookies = get_cookies(user.id)
+                    embed.description += '\nУ вас меньше очков, чем у дилера\nВы проиграли\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
+                    await msg.edit(embed=embed)
+                if sum(hand) > sum(dealer):
+                    cookies = get_cookies(user.id)
+                    print(cookies)
+                    print(amt)
+                    add(user.id, amt * 2)
+                    cookies = get_cookies(user.id)
+                    embed.description += '\nУ вас больше очков, чем у дилера\nВы победили\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
+                    await msg.edit(embed=embed)
 
 
 def cookies_setup(bot):
