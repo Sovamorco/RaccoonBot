@@ -1,10 +1,10 @@
+from utils import form
 from discord.ext import commands
 import discord
 import requests
 from json import load
 from random import choice
 from html import unescape
-import asyncio
 from credentials import osu_key, genius_token
 from enum import IntFlag
 from bs4 import BeautifulSoup
@@ -51,7 +51,8 @@ class Misc(commands.Cog):
         self.bot = bot
 
     async def cog_command_error(self, ctx, error):
-        await ctx.send('Ошибка:\n' + str(error.original))
+        if isinstance(error, commands.CommandInvokeError) and str(error.original):
+            await ctx.send('Ошибка:\n' + str(error.original))
 
     @commands.command(name='raccoon', aliases=['racc'], help='Команда, которая сделает вашу жизнь лучше',
                       usage='?[racc|raccoon]')
@@ -76,6 +77,16 @@ class Misc(commands.Cog):
         embed = discord.Embed()
         embed.set_image(url=image)
         return await ctx.send(msg, embed=embed)
+
+    @commands.command(name='purge', help='Команда для удаления последних сообщений',
+                      usage='?purge <кол-во>')
+    async def purge_(self, ctx, amt: int = 0):
+        if amt == 0:
+            return await ctx.send('Использование: ?purge <кол-во>')
+        channel = ctx.message.channel
+        deleted = await channel.purge(limit=amt + 1, check=lambda msg: True)
+        amt = len(deleted) - 1
+        return await ctx.send('Удалено {} {}'.format(amt, form(amt, ['сообщение', 'сообщения', 'сообщений'])))
 
     @commands.command(name='fact', aliases=['facts'], help='Команда, возвращающая рандомные факты',
                       usage='?[fact|facts]')
@@ -122,13 +133,20 @@ class Misc(commands.Cog):
             embed = discord.Embed(title='Выберите фэндом', description=embedValue)
             embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
             choicemsg = await ctx.send(embed=embed)
+            canc = False
 
             def verify(m):
+                nonlocal canc
                 if m.content.isdigit():
-                    return (0 <= int(m.content) <= len(new_results)) and (m.channel == text_channel) and (m.author == user)
-                return False
+                    return (0 <= int(m.content) <= len(new_results)) and (m.channel == text_channel) and (
+                            m.author == user)
+                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith('?')) and len(
+                    m.content) > 1
+                return canc
 
             msg = await self.bot.wait_for('message', check=verify, timeout=30)
+            if canc:
+                return
             if int(msg.content) == 0:
                 return await choicemsg.delete()
             result = new_results[int(msg.content) - 1]
@@ -192,14 +210,14 @@ class Misc(commands.Cog):
             if thumb is not None:
                 embed.set_thumbnail(url=thumb)
             return await ctx.send(user.mention, embed=embed)
-        except asyncio.TimeoutError:
-            return
         except requests.exceptions.ConnectTimeout:
             await ctx.send('Не удалось подключиться к Wikia')
 
     @commands.command(aliases=['l'], usage='?[l|lyrics] <запрос>',
                       help='Команда для отображения текста текущего трека')
-    async def lyrics(self, ctx, *, title):
+    async def lyrics(self, ctx, *, title=None):
+        if title is None:
+            return await ctx.send('Использование: ?[l|lyrics] <запрос>')
         text_channel = ctx.message.channel
         user = ctx.message.author
         ftitle = re.sub(r'\[([^)]+?)]', '', re.sub(r'\(([^)]+?)\)', '', title.lower()))
@@ -227,14 +245,20 @@ class Misc(commands.Cog):
             embed = discord.Embed(title='Выберите трек', description=embedValue)
             embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
             choicemsg = await ctx.send(embed=embed)
+            canc = False
 
             def verify(m):
+                nonlocal canc
                 if m.content.isdigit():
                     return (0 <= int(m.content) <= len(new_results)) and (m.channel == text_channel) and (
                                 m.author == user)
-                return False
+                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith('?')) and len(
+                    m.content) > 1
+                return canc
 
             msg = await self.bot.wait_for('message', check=verify, timeout=30)
+            if canc:
+                return
             if int(msg.content) == 0:
                 return await choicemsg.delete()
             result = new_results[int(msg.content) - 1]
