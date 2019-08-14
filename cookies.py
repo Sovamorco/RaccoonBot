@@ -201,7 +201,8 @@ class Cookies(commands.Cog):
                         else:
                             cookies = get_cookies(user.id)
                             embed.description += '\n\nУ вас больше 21 очка, вы проиграли\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
-                            return await msg.edit(embed=embed)
+                            await msg.edit(embed=embed)
+                            break
                 if response.content.lower() == 'dd':
                     add(user.id, -1*amt)
                     if len(split) == 2:
@@ -223,15 +224,18 @@ class Cookies(commands.Cog):
                         else:
                             cookies = get_cookies(user.id)
                             embed.description += '\n\nУ вас больше 21 очка, вы проиграли\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
-                            return await msg.edit(embed=embed)
+                            await msg.edit(embed=embed)
+                            break
                     embed.description += '\nСумма карт у вас в руке{} - {}'.format(snum, sum(hand))
                     break
                 if response.content.lower() == 'stand':
                     embed.description += '\n\nВы оставили текущую руку\nСумма карт у вас в руке{} - {}'.format(snum, sum(hand))
                     break
+        if len(split) == 1 and sum(split[0]) > 21:
+            return
         embed.description += '\n\nДилер открывает вторую карту - {}\n'.format(frt[0])
         await msg.edit(embed=embed)
-        while sum(dealer) < 18:
+        while sum(dealer) < 17:
             embed.description += '\nСумма карт в руке у дилера - {}'.format(sum(dealer))
             new = draw(deck)
             embed.description += '\nДилер берет {}'.format(new[0])
