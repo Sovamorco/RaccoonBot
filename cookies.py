@@ -246,7 +246,7 @@ class Cookies(commands.Cog):
                             if sum(split[i]) <= 21:
                                 add(user.id, spamt[i] * 2)
                     else:
-                        add(user.id, amt)
+                        add(user.id, amt * 2)
                     cookies = get_cookies(user.id)
                     embed.description += '\nУ дилера больше 21 очка, вы победили\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
                     return await msg.edit(embed=embed)
@@ -270,8 +270,6 @@ class Cookies(commands.Cog):
                     await msg.edit(embed=embed)
                 if sum(hand) > sum(dealer):
                     cookies = get_cookies(user.id)
-                    print(cookies)
-                    print(amt)
                     add(user.id, amt * 2)
                     cookies = get_cookies(user.id)
                     embed.description += '\nУ вас больше очков, чем у дилера\nВы победили\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
