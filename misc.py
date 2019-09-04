@@ -1,4 +1,3 @@
-from utils import form
 from discord.ext import commands
 import discord
 import requests
@@ -78,23 +77,13 @@ class Misc(commands.Cog):
         embed.set_image(url=image)
         return await ctx.send(msg, embed=embed)
 
-    @commands.command(name='purge', help='Команда для удаления последних сообщений',
-                      usage='?purge <кол-во>')
-    async def purge_(self, ctx, amt: int = 0):
-        if amt == 0:
-            return await ctx.send('Использование: ?purge <кол-во>')
-        channel = ctx.message.channel
-        deleted = await channel.purge(limit=amt + 1, check=lambda msg: True)
-        amt = len(deleted) - 1
-        return await ctx.send('Удалено {} {}'.format(amt, form(amt, ['сообщение', 'сообщения', 'сообщений'])))
-
-    @commands.command(name='fact', aliases=['facts'], help='Команда, возвращающая рандомные факты',
+    @commands.command(name='fact', aliases=['facts'], help='Команда, возвращающая случайные факты',
                       usage='?[fact|facts]')
-    async def facts_(self, ctx, *, msg):
+    async def fact_(self, ctx, *, msg=None):
         user = ctx.author
         if msg is None:
             msg = user.mention
-        with open('resources/facts.txt', 'r') as f:
+        with open('resources/facts.json', 'r') as f:
             facts = load(f)
             fact = choice(facts)
         embed = discord.Embed(description=fact)
@@ -146,7 +135,7 @@ class Misc(commands.Cog):
 
             msg = await self.bot.wait_for('message', check=verify, timeout=30)
             if canc:
-                return
+                return await choicemsg.delete()
             if int(msg.content) == 0:
                 return await choicemsg.delete()
             result = new_results[int(msg.content) - 1]
@@ -213,6 +202,151 @@ class Misc(commands.Cog):
         except requests.exceptions.ConnectTimeout:
             await ctx.send('Не удалось подключиться к Wikia')
 
+    @commands.command(name='fandom', help='Вторая команда для поиска статей на Fandom',
+                      usage='?fandom <фэндом>')
+    async def fandom_(self, ctx, *, query=None):
+        try:
+            text_channel = ctx.message.channel
+            if query is None:
+                return await ctx.send('Использование: ?fandom <фэндом>')
+            apiurl = 'https://community.fandom.com/api/v1/Search/CrossWiki'
+            user = ctx.message.author
+            params = {
+                'expand': 1,
+                'query': query,
+                'lang': 'en',
+                'limit': 10,
+                'batch': 1,
+                'rank': 'default'
+            }
+            result = requests.get(apiurl, params=params, timeout=0.5).json()
+            if 'exception' in result.keys():
+                return await ctx.send('Ничего не найдено')
+            results = result['items']
+            new_results = []
+            embedValue = ''
+            i = 0
+            for result in results:
+                if result:
+                    if result['title']:
+                        i += 1
+                        embedValue += '{}. {}\n'.format(i, result['title'])
+                        new_results.append(result)
+            if len(new_results) < 10:
+                params['lang'] = 'ru'
+                result = requests.get(apiurl, params=params, timeout=0.5).json()
+                if 'exception' in result.keys():
+                    pass
+                else:
+                    results = result['items']
+                    for result in results:
+                        if i == 10:
+                            break
+                        if result:
+                            if result['title']:
+                                i += 1
+                                embedValue += '{}. {}\n'.format(i, result['title'])
+                                new_results.append(result)
+            embed = discord.Embed(title='Выберите фэндом', description=embedValue)
+            embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
+            choicemsg = await ctx.send(embed=embed)
+            canc = False
+
+            def verify(m):
+                nonlocal canc
+                if m.content.isdigit():
+                    return (0 <= int(m.content) <= len(new_results)) and (m.channel == text_channel) and (
+                            m.author == user)
+                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith('?')) and len(
+                    m.content) > 1
+                return canc
+
+            msg = await self.bot.wait_for('message', check=verify, timeout=30)
+            if canc:
+                return await choicemsg.delete()
+            if int(msg.content) == 0:
+                return await choicemsg.delete()
+            result = new_results[int(msg.content) - 1]
+            await choicemsg.delete()
+            if result['url'].endswith('/'):
+                apiurl = '{}api/v1/'.format(result['url'])
+            else:
+                apiurl = '{}/api/v1/'.format(result['url'])
+            embed = discord.Embed(title='Введите запрос', description='Отправьте запрос для поска по {}'.format(result['title']))
+            embed.set_footer(text='Автоматическая отмена через 60 секунд\nОтправьте 0 для отмены')
+            choicemsg = await ctx.send(embed=embed)
+            canc = False
+
+            def verify(m):
+                nonlocal canc
+                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith('?')) and len(
+                    m.content) > 1
+                return (m.channel == text_channel) and (m.author == user)
+
+            msg = await self.bot.wait_for('message', check=verify, timeout=60)
+            if canc:
+                return await choicemsg.delete()
+            query = msg.content
+            params = {
+                'query': query,
+                'namespaces': '0,14',
+                'limit': 1,
+                'minArticleQuality': 0,
+                'batch': 1
+            }
+            try:
+                result = requests.get(apiurl + 'Search/List', params=params, timeout=0.5).json()
+            except Exception as e:
+                embed = discord.Embed(title='Ошибка', description='Ничего не найдено')
+                await choicemsg.edit(embed=embed)
+                return print(e)
+            if 'exception' in result.keys() or result['batches'] == 0:
+                embed = discord.Embed(title='Ошибка', description='Ничего не найдено')
+                return await choicemsg.edit(embed=embed)
+            page_id = result['items'][0]['id']
+            params = {
+                'ids': page_id,
+                'abstract': 500,
+                'width': 200,
+                'height': 200
+            }
+            result = requests.get(apiurl + 'Articles/Details', params=params, timeout=0.5).json()
+            basepath = result['basepath']
+            result = result['items'][str(page_id)]
+            page_url = basepath + result['url']
+            title = result['title']
+            desc = unescape(result['abstract'])
+            dims = result['original_dimensions']
+            thumb = result['thumbnail']
+            if dims is not None:
+                width = dims['width']
+                height = dims['height']
+                if width <= 200:
+                    params = {
+                        'ids': page_id,
+                        'abstract': 0,
+                        'width': width,
+                        'height': height
+                    }
+                else:
+                    ratio = height / width
+                    width = 200
+                    height = ratio * width
+                    params = {
+                        'ids': page_id,
+                        'abstract': 0,
+                        'width': width,
+                        'height': height
+                    }
+                result = requests.get(apiurl + 'Articles/Details', params=params, timeout=0.5).json()
+                thumb = result['items'][str(page_id)]['thumbnail']
+            embed = discord.Embed(title=title, url=page_url, description=desc)
+            if thumb is not None:
+                embed.set_thumbnail(url=thumb)
+            return await choicemsg.edit(content=user.mention, embed=embed)
+        except requests.exceptions.ConnectTimeout:
+            await ctx.send('Не удалось подключиться к Wikia')
+
     @commands.command(aliases=['l'], usage='?[l|lyrics] <запрос>',
                       help='Команда для отображения текста текущего трека')
     async def lyrics(self, ctx, *, title=None):
@@ -258,7 +392,7 @@ class Misc(commands.Cog):
 
             msg = await self.bot.wait_for('message', check=verify, timeout=30)
             if canc:
-                return
+                return await choicemsg.delete()
             if int(msg.content) == 0:
                 return await choicemsg.delete()
             result = new_results[int(msg.content) - 1]
@@ -372,20 +506,6 @@ class Misc(commands.Cog):
                 link = 'https://discordapp.com/channels/{}/{}'.format(ctx.guild.id, ch.id)
                 embed = discord.Embed(description='[Магическая ссылка для канала {}]({})'.format(ch.name, link))
                 return await ctx.send(embed=embed)
-        return await ctx.send('Канал с таким именем не найден')
-
-    @commands.command(usage='?move <название канала>',
-                      help='Команда для перемещения всех из одного канала в другой')
-    async def move(self, ctx, *, channel: str):
-        if ctx.author.voice.channel.name.lower() == channel.lower():
-            return await ctx.send('Уже подключен к голосовому каналу')
-        channels = await ctx.guild.fetch_channels()
-        for ch in channels:
-            if (ch.__class__ == discord.channel.VoiceChannel) and (ch.name.lower() == channel.lower()):
-                members = ctx.author.voice.channel.members
-                for member in members:
-                    await member.move_to(ch)
-                return await ctx.send('*⃣ | Перемещен в {}'.format(ch.name))
         return await ctx.send('Канал с таким именем не найден')
 
 
