@@ -206,6 +206,7 @@ class Cookies(commands.Cog):
                 if response.content.lower() == 'dd':
                     add(user.id, -1*amt)
                     if len(split) == 2:
+                        # noinspection PyUnboundLocalVariable
                         spamt[num-1] *= 2
                     else:
                         amt *= 2

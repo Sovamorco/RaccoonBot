@@ -58,7 +58,7 @@ class Shadowverse(commands.Cog):
 
                 msg = await self.bot.wait_for('message', check=verify, timeout=30)
                 if canc:
-                    return
+                    return await choice.delete()
                 if int(msg.content) == 0:
                     return await choice.delete()
                 result = results[int(msg.content)-1]
@@ -126,7 +126,7 @@ class Shadowverse(commands.Cog):
 
                 msg = await self.bot.wait_for('message', check=verify, timeout=30)
                 if canc:
-                    return
+                    return await choice.delete()
                 if int(msg.content) == 0:
                     return await choice.delete()
                 result = results[int(msg.content) - 1]

@@ -17,6 +17,7 @@ from credentials import main_password, main_nickname, main_web_addr, gachi_thing
 url_rx = re.compile('https?://(?:www\\.)?.+')
 
 
+# noinspection PyProtectedMember
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -101,7 +102,7 @@ class Music(commands.Cog):
 
                 msg = await self.bot.wait_for('message', check=verify, timeout=30)
                 if canc:
-                    return
+                    return await choice.delete()
                 if int(msg.content) == 0:
                     return await choice.delete()
                 track = tracks[int(msg.content) - 1]
