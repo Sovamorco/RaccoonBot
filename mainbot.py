@@ -3,19 +3,35 @@ from music import *
 from misc import *
 from shadowverse import *
 from cookies import *
-from credentials import discord_status
+from moderation import *
+from credentials import discord_status, discord_alpha_token
 
-bot = commands.Bot(command_prefix=commands.when_mentioned_or('?'), description='Cutest bot on Discord (subjective)')
+if sys.gettrace() is None:
+    dev = False
+else:
+    dev = True
+
+default_prefix = '?'
+
+
+def prefix(dbot, msg):
+    servid = str(msg.guild.id)
+    prefixes = json.load(open('resources/prefixes.json', 'r'))
+    pr = 'r?' if dev else prefixes.get(servid, default_prefix)
+    return commands.when_mentioned_or(pr)(dbot, msg)
+
+
+bot = commands.Bot(command_prefix=prefix, description='Cutest bot on Discord (subjective)')
 bot.remove_command('help')
 
 
 async def change_status():
     while True:
         # Смена состояния(просто ради красоты)
-        if sys.gettrace() is None:
-            status = '?help | {}'.format(random.choice(discord_status))
-        else:
+        if dev:
             status = 'In Development'
+        else:
+            status = '?help | {}'.format(random.choice(discord_status))
         activity = discord.Streaming(name=status, url='https://twitch.tv/mrdandycorn')
         await bot.change_presence(activity=activity)
         await asyncio.sleep(300)
@@ -29,10 +45,11 @@ async def on_ready():
         music_setup(bot)
         cookies_setup(bot)
         sv_setup(bot)
+        mod_setup(bot)
     except discord.errors.ClientException:
         pass
     # Проверка обновлений на сообщении, в случае, если что-то изменилось, пока бот был оффлайн
-    if sys.gettrace() is None:
+    if not dev:
         check()
     print('Logged on as', bot.user)
 
@@ -135,4 +152,7 @@ async def help_(context, request=None):
         await text_channel.send('Ошибка: \n {}'.format(e))
 
 
-bot.run(discord_bot_token)
+if dev:
+    bot.run(discord_alpha_token)
+else:
+    bot.run(discord_bot_token)
