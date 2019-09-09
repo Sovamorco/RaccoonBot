@@ -463,6 +463,9 @@ class Music(commands.Cog):
     async def ensure_voice(self, ctx):
         player = self.bot.lavalink.players.create(ctx.guild.id, endpoint=str(ctx.guild.region))
         should_connect = ctx.command.name in ('play', 'join', 'why', 'tts', 'join', 'gachibass', 'mindful', 'move')
+        ignored = ctx.command.name in 'volume'
+        if ignored:
+            return
         if not ctx.author.voice or not ctx.author.voice.channel:
             return await ctx.send('Сначала подключитесь к голосовому каналу')
         if not player.is_connected:
