@@ -39,10 +39,8 @@ class Music(commands.Cog):
 
     async def cog_before_invoke(self, ctx):
         guild_check = ctx.guild is not None
-
         if guild_check:
             await self.ensure_voice(ctx)
-
         return guild_check
 
     async def cog_command_error(self, ctx, error):
@@ -57,6 +55,7 @@ class Music(commands.Cog):
 
     @commands.command(aliases=['p'], usage='?[p|play] <ссылка/название>', help='Команда для проигрывания музыки')
     async def play(self, ctx, *, query: str = ''):
+        await ctx.send('Музыка с YouTube временно не работает')
         player = self.bot.lavalink.players.get(ctx.guild.id)
         if not query:
             if player.paused:
@@ -144,6 +143,7 @@ class Music(commands.Cog):
     @commands.command(usage='?[gachi|gachibass] [кол-во]', help='Команда для проигрывания правильных версий музыки',
                       aliases=['gachi'])
     async def gachibass(self, ctx, amt: int = 1):
+        return await ctx.send('Музыка с YouTube временно не работает')
         if amt > 100:
             return await ctx.send('Нет')
         player = self.bot.lavalink.players.get(ctx.guild.id)
