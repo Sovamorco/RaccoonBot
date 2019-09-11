@@ -31,6 +31,9 @@ class Music(commands.Cog):
             bot.lavalink.add_node(addr, 2333, main_password, 'ru', 'default-node')
             bot.add_listener(bot.lavalink.voice_update_handler, 'on_socket_response')
 
+    class musicCommandError(commands.CommandInvokeError):
+        pass
+
     def cog_unload(self):
         self.bot.lavalink._event_hooks.clear()
 
@@ -44,7 +47,9 @@ class Music(commands.Cog):
 
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.CommandInvokeError) and str(error.original):
-            await ctx.send('Ошибка:\n' + str(error.original))
+            if isinstance(error, self.musicCommandError):
+                return await ctx.send(str(error.original))
+            return await ctx.send('Ошибка:\n' + str(error.original))
 
     async def connect_to(self, guild_id: int, channel_id):
         ws = self.bot._connection._get_websocket(guild_id)
@@ -467,13 +472,13 @@ class Music(commands.Cog):
         if ignored:
             return
         if not ctx.author.voice or not ctx.author.voice.channel:
-            return await ctx.send('Сначала подключитесь к голосовому каналу')
+            raise self.musicCommandError('Сначала подключитесь к голосовому каналу')
         if not player.is_connected:
             if not should_connect:
-                return await ctx.send('Я не подключен к каналу')
+                raise self.musicCommandError('Я не подключен к каналу')
             permissions = ctx.author.voice.channel.permissions_for(ctx.me)
             if not permissions.connect or not permissions.speak:
-                return await ctx.send('I need the `CONNECT` and `SPEAK` permissions.')
+                raise self.musicCommandError('I need the `CONNECT` and `SPEAK` permissions.')
             player.store('channel', ctx.channel.id)
             await self.connect_to(ctx.guild.id, str(ctx.author.voice.channel.id))
         else:
@@ -482,7 +487,7 @@ class Music(commands.Cog):
             if should_connect:
                 return await self.connect_to(ctx.guild.id, str(ctx.author.voice.channel.id))
             if int(player.channel_id) != ctx.author.voice.channel.id:
-                return await ctx.send('Мы в разных голосовых каналах')
+                raise self.musicCommandError('Мы в разных голосовых каналах')
 
 
 def music_setup(bot):
