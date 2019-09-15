@@ -9,6 +9,11 @@ from enum import IntFlag
 from bs4 import BeautifulSoup
 import re
 
+proxies = {
+    'http': 'socks4://91.83.227.147:57276',
+    #'https': 'socks4://91.83.227.147:57276'
+}
+
 
 class osumods(IntFlag):
     NoMod = 0,
@@ -72,7 +77,7 @@ class Misc(commands.Cog):
         user = ctx.author
         if msg is None:
             msg = user.mention
-        image = requests.get('http://inspirobot.me/api?generate=true').text
+        image = requests.get('http://inspirobot.me/api?generate=true', proxies=proxies).text
         embed = discord.Embed()
         embed.set_image(url=image)
         return await ctx.send(msg, embed=embed)

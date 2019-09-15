@@ -117,28 +117,6 @@ class Music(commands.Cog):
         if not player.is_playing:
             await player.play()
 
-    @commands.command(aliases=['wisdom'], usage='?[mindful|wisdom]',
-                      help='Команда для проигрывания аудио, сгенерированного InspiroBot Mindful')
-    async def mindful(self, ctx):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
-        session_id = requests.get('http://inspirobot.me/api?getSessionID=1').text
-        mindful = requests.get('http://inspirobot.me/api?generateFlow=1&sessionID='+session_id).json()
-        audio_url = mindful['mp3']
-        data = mindful['data']
-        text = ''
-        for item in data:
-            if item['type'] == 'quote':
-                text += '{}\n'.format(item['text'])
-        text = re.sub(r'\[([^)]+?)]', "", text)
-        results = await player.node.get_tracks(audio_url)
-        if results['loadType'] != 'TRACK_LOADED':
-            return await ctx.send('Произошла ошибка. Попробуйте еще раз')
-        track = results['tracks'][0]
-        player.add(requester=ctx.author.id, track=track)
-        await ctx.send(text)
-        if not player.is_playing:
-            await player.play()
-
     @commands.command(usage='?[gachi|gachibass] [кол-во]', help='Команда для проигрывания правильных версий музыки',
                       aliases=['gachi'])
     async def gachibass(self, ctx, amt: int = 1):
@@ -465,7 +443,7 @@ class Music(commands.Cog):
 
     async def ensure_voice(self, ctx):
         player = self.bot.lavalink.players.create(ctx.guild.id, endpoint=str(ctx.guild.region))
-        should_connect = ctx.command.name in ('play', 'join', 'why', 'tts', 'join', 'gachibass', 'mindful', 'move')
+        should_connect = ctx.command.name in ('play', 'join', 'why', 'tts', 'join', 'gachibass', 'move')
         ignored = ctx.command.name in 'volume'
         if ignored:
             return
