@@ -57,7 +57,7 @@ class Music(commands.Cog):
             if player.paused:
                 await player.set_pause(False)
                 return await ctx.send('⏯ | Воспроизведение возобновлено')
-            if not player.is_playing:
+            if not player.is_playing and (player.queue or player.current):
                 return await player.play()
             else:
                 return await ctx.send(f'Использование: {pref}[p|play] <ссылка/название>')
