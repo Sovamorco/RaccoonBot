@@ -1,6 +1,6 @@
 from discord.ext import commands
 import discord
-from utils import form
+from utils import form, get_prefix
 import json
 
 
@@ -13,17 +13,18 @@ class Moderation(commands.Cog):
             await ctx.send('Ошибка:\n' + str(error.original))
 
     @commands.command(name='purge', help='Команда для удаления последних сообщений',
-                      usage='?purge <кол-во>')
+                      usage='{}purge <кол-во>')
     @commands.has_permissions(manage_messages=True)
     async def purge_(self, ctx, amt: int = 0):
         if amt == 0:
-            return await ctx.send('Использование: ?purge <кол-во>')
+            pref = await get_prefix(self.bot, ctx.message)
+            return await ctx.send(f'Использование: {pref}purge <кол-во>')
         channel = ctx.message.channel
         deleted = await channel.purge(limit=amt + 1, check=lambda msg: True)
         amt = len(deleted) - 1
         return await ctx.send('Удалено {} {}'.format(amt, form(amt, ['сообщение', 'сообщения', 'сообщений'])))
 
-    @commands.command(usage='?move <название канала>',
+    @commands.command(usage='{}move <название канала>',
                       help='Команда для перемещения всех из одного канала в другой')
     @commands.has_permissions(move_members=True)
     async def move(self, ctx, *, channel: str):
@@ -39,7 +40,7 @@ class Moderation(commands.Cog):
         return await ctx.send('Канал с таким именем не найден')
 
     @commands.command(name='prefix', pass_context=True, help='Команда для установки префикса бота',
-                      usage='?prefix [префикс]')
+                      usage='{}prefix [префикс]')
     @commands.has_permissions(administrator=True)
     async def pref_(self, ctx, pref=None):
         if not pref:

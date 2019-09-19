@@ -6,3 +6,10 @@ def form(num, arr):
     if abs(num) % 10 > 4 or abs(num) % 10 == 0:
         return arr[2]
     return arr[1]
+
+
+async def get_prefix(bot, msg):
+    pref = await bot.get_prefix(msg)
+    for pr in pref:
+        if str(bot.user.id) not in pr:
+            return pr

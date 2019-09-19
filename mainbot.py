@@ -1,15 +1,11 @@
 from check import *
 from music import *
 from misc import *
-from shadowverse import *
+from games import *
 from cookies import *
 from moderation import *
-from credentials import discord_status, discord_alpha_token
-
-if sys.gettrace() is None:
-    dev = False
-else:
-    dev = True
+from credentials import discord_status, discord_alpha_token, dev
+from utils import get_prefix
 
 default_prefix = '?'
 
@@ -44,7 +40,7 @@ async def on_ready():
         misc_setup(bot)
         music_setup(bot)
         cookies_setup(bot)
-        sv_setup(bot)
+        games_setup(bot)
         mod_setup(bot)
     except discord.errors.ClientException:
         pass
@@ -105,23 +101,21 @@ async def on_raw_reaction_remove(payload):
 
 
 @bot.command(name='update', pass_context=True, hidden=True)
-async def update(context):
-    text_channel = context.message.channel
+async def update(ctx):
     try:
-        user = context.message.author
-        if user.name == main_nickname:
-            async with text_channel.typing():
+        if ctx.author.id == discord_pers_id:
+            async with ctx.channel.typing():
                 check()
-                await text_channel.send('Обновил роли!')
+                await ctx.send('Обновил роли!')
     except Exception as e:
-        await text_channel.send('Ошибка: \n {}'.format(e))
+        await ctx.send('Ошибка: \n {}'.format(e))
 
 
-@bot.command(name='help', pass_context=True, help='Команда для показа этого сообщения', usage='?help [команда]')
-async def help_(context, request=None):
-    text_channel = context.message.channel
+@bot.command(name='help', pass_context=True, help='Команда для вывода этого сообщения', usage='{}help [команда]')
+async def help_(ctx, request=None):
     commandlist = {}
     try:
+        pref = await get_prefix(bot, ctx.message)
         if request is None:
             embed = discord.Embed(title='Команды')
             for command in bot.commands:
@@ -131,13 +125,14 @@ async def help_(context, request=None):
                     else:
                         cog = 'Main'
                     if cog not in commandlist.keys():
-                        commandlist[cog] = command.name
+                        commandlist[cog] = [command.name]
                     else:
-                        commandlist[cog] += ', {}'.format(command.name)
-            for cog in commandlist.keys():
+                        commandlist[cog].append(command.name)
+            for cog in sorted(commandlist.keys()):
+                commandlist[cog] = ', '.join(sorted(commandlist[cog]))
                 embed.add_field(name=cog, value=commandlist[cog])
-            embed.set_footer(text='Более подробно: ?help <команда>')
-            return await text_channel.send(embed=embed)
+            embed.set_footer(text=f'Более подробно: {pref}help <команда>')
+            return await ctx.send(embed=embed)
         for command in bot.commands:
             if ((command.name == request.lower()) or (request.lower() in command.aliases)) and not command.hidden:
                 if command.aliases:
@@ -145,11 +140,11 @@ async def help_(context, request=None):
                 else:
                     embed = discord.Embed(title=command.name)
                 embed.add_field(name='Описание', value=command.help)
-                embed.add_field(name='Использование', value=command.usage)
-                return await text_channel.send(embed=embed)
-        return await text_channel.send('Нет команды {}'.format(request))
+                embed.add_field(name='Использование', value=command.usage.format(pref))
+                return await ctx.send(embed=embed)
+        return await ctx.send('Нет команды {}'.format(request))
     except Exception as e:
-        await text_channel.send('Ошибка: \n {}'.format(e))
+        await ctx.send('Ошибка: \n {}'.format(e))
 
 
 if dev:

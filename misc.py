@@ -4,50 +4,15 @@ import requests
 from json import load
 from random import choice
 from html import unescape
-from credentials import osu_key, genius_token
-from enum import IntFlag
+from credentials import genius_token
 from bs4 import BeautifulSoup
 import re
+from utils import get_prefix
 
 proxies = {
     'http': 'socks4://91.83.227.147:57276',
-    #'https': 'socks4://91.83.227.147:57276'
+    # 'https': 'socks4://91.83.227.147:57276'
 }
-
-
-class osumods(IntFlag):
-    NoMod = 0,
-    NF = 1,
-    EZ = 2,
-    TD = 4,
-    HD = 8,
-    HR = 16,
-    SD = 32,
-    DT = 64,
-    RX = 128,
-    HT = 256,
-    NC = 512,
-    FL = 1024,
-    Auto = 2048,
-    SO = 4096,
-    AP = 8192,
-    PF = 16384,
-    Key4 = 32768,
-    Key5 = 65536,
-    Key6 = 131072,
-    Key7 = 262144,
-    Key8 = 524288,
-    FadeIn = 1048576,
-    Random = 2097152,
-    Cinema = 4194304,
-    Target = 8388608,
-    Key9 = 16777216,
-    KeyCoop = 33554432,
-    Key1 = 67108864,
-    Key3 = 134217728,
-    Key2 = 268435456,
-    ScoreV2 = 536870912,
-    LastMod = 1073741824
 
 
 class Misc(commands.Cog):
@@ -59,7 +24,7 @@ class Misc(commands.Cog):
             await ctx.send('Ошибка:\n' + str(error.original))
 
     @commands.command(name='raccoon', aliases=['racc'], help='Команда, которая сделает вашу жизнь лучше',
-                      usage='?[racc|raccoon]')
+                      usage='{}[racc|raccoon]')
     async def raccoon_(self, ctx, *, msg=None):
         user = ctx.author
         if msg is None:
@@ -72,7 +37,7 @@ class Misc(commands.Cog):
         return await ctx.send(msg, embed=embed)
 
     @commands.command(name='inspirobot', aliases=['inspire'], help='Команда для генерации "воодушевляющих" картинок',
-                      usage='?[inspire|inspirobot]')
+                      usage='{}[inspire|inspirobot]')
     async def inspire_(self, ctx, *, msg=None):
         user = ctx.author
         if msg is None:
@@ -83,7 +48,7 @@ class Misc(commands.Cog):
         return await ctx.send(msg, embed=embed)
 
     @commands.command(name='fact', aliases=['facts'], help='Команда, возвращающая случайные факты',
-                      usage='?[fact|facts]')
+                      usage='{}[fact|facts]')
     async def fact_(self, ctx, *, msg=None):
         user = ctx.author
         if msg is None:
@@ -95,12 +60,13 @@ class Misc(commands.Cog):
         return await ctx.send(msg, embed=embed)
 
     @commands.command(name='wikia', aliases=['wiki'], help='Команда для поиска статей на Fandom',
-                      usage='?[wikia|wiki] <запрос>')
+                      usage='{}[wikia|wiki] <запрос>')
     async def wikia_(self, ctx, *, query=None):
         try:
             text_channel = ctx.message.channel
+            pref = await get_prefix(self.bot, ctx.message)
             if query is None:
-                return await ctx.send('Использование: ?[wikia|wiki] <запрос>')
+                return await ctx.send(f'Использование: {pref}[wikia|wiki] <запрос>')
             apiurl = 'https://community.fandom.com/api/v1/Search/CrossWiki'
             user = ctx.message.author
             params = {
@@ -134,7 +100,7 @@ class Misc(commands.Cog):
                 if m.content.isdigit():
                     return (0 <= int(m.content) <= len(new_results)) and (m.channel == text_channel) and (
                             m.author == user)
-                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith('?')) and len(
+                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(
                     m.content) > 1
                 return canc
 
@@ -208,12 +174,13 @@ class Misc(commands.Cog):
             await ctx.send('Не удалось подключиться к Wikia')
 
     @commands.command(name='fandom', help='Вторая команда для поиска статей на Fandom',
-                      usage='?fandom <фэндом>')
+                      usage='{}fandom <фэндом>')
     async def fandom_(self, ctx, *, query=None):
         try:
             text_channel = ctx.message.channel
+            pref = await get_prefix(self.bot, ctx.message)
             if query is None:
-                return await ctx.send('Использование: ?fandom <фэндом>')
+                return await ctx.send(f'Использование: {pref}fandom <фэндом>')
             apiurl = 'https://community.fandom.com/api/v1/Search/CrossWiki'
             user = ctx.message.author
             params = {
@@ -262,7 +229,7 @@ class Misc(commands.Cog):
                 if m.content.isdigit():
                     return (0 <= int(m.content) <= len(new_results)) and (m.channel == text_channel) and (
                             m.author == user)
-                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith('?')) and len(
+                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(
                     m.content) > 1
                 return canc
 
@@ -284,7 +251,7 @@ class Misc(commands.Cog):
 
             def verify(m):
                 nonlocal canc
-                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith('?')) and len(
+                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(
                     m.content) > 1
                 return (m.channel == text_channel) and (m.author == user)
 
@@ -352,11 +319,12 @@ class Misc(commands.Cog):
         except requests.exceptions.ConnectTimeout:
             await ctx.send('Не удалось подключиться к Wikia')
 
-    @commands.command(aliases=['l'], usage='?[l|lyrics] <запрос>',
+    @commands.command(aliases=['l'], usage='{}[l|lyrics] <запрос>',
                       help='Команда для отображения текста текущего трека')
     async def lyrics(self, ctx, *, title=None):
+        pref = await get_prefix(self.bot, ctx.message)
         if title is None:
-            return await ctx.send('Использование: ?[l|lyrics] <запрос>')
+            return await ctx.send(f'Использование: {pref}[l|lyrics] <запрос>')
         text_channel = ctx.message.channel
         user = ctx.message.author
         ftitle = re.sub(r'\[([^)]+?)]', '', re.sub(r'\(([^)]+?)\)', '', title.lower()))
@@ -391,7 +359,7 @@ class Misc(commands.Cog):
                 if m.content.isdigit():
                     return (0 <= int(m.content) <= len(new_results)) and (m.channel == text_channel) and (
                                 m.author == user)
-                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith('?')) and len(
+                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(
                     m.content) > 1
                 return canc
 
@@ -427,78 +395,7 @@ class Misc(commands.Cog):
                                       title='Текст ' + title, description=lyrics)
                 return await ctx.send(embed=embed)
 
-    @commands.command(name='osuplayer', aliases=['op'], help='Команда для получения информации о игроке osu!standart',
-                      usage='?[op|osuplayer] <ник/id>')
-    async def op_(self, ctx, *, nickname=''):
-        if not nickname:
-            return await ctx.send('Использование: ?[op|osuplayer] <ник/id>')
-        api_link = 'https://osu.ppy.sh/api/'
-        params = {
-            'k': osu_key,
-            'u': nickname
-        }
-        r = requests.get(api_link + 'get_user', params=params, timeout=2).json()
-        if not r:
-            return await ctx.send('Пользователь не найден')
-        result = r[0]
-        if result['playcount'] is None:
-            return await ctx.send('Слишком мало информации по пользователю')
-        embed = discord.Embed(title=result['username'], url='https://osu.ppy.sh/users/{}'.format(result['user_id']))
-        embed.set_thumbnail(url='https://a.ppy.sh/{}'.format(result['user_id']))
-        embed.add_field(name='Rank', value='{:,}'.format(int(result['pp_rank'])))
-        embed.add_field(name='Country rank :flag_{}:'.format(result['country'].lower()),
-                        value='{:,}'.format(int(result['pp_country_rank'])))
-        embed.add_field(name='PP', value='{:,}'.format(round(float(result['pp_raw']))))
-        embed.add_field(name='Accuracy', value=str(round(float(result['accuracy']), 2)) + '%')
-        embed.add_field(name='Level', value=str(int(float(result['level']))))
-        embed.add_field(name='Play Count', value='{:,}'.format(int(result['playcount'])))
-        embed.add_field(name='Ranked Score', value='{:,}'.format(int(result['ranked_score'])))
-        embed.add_field(name='Total Score', value='{:,}'.format(int(result['total_score'])))
-        await ctx.send(ctx.author.mention, embed=embed)
-
-    @commands.command(name='osuplays', aliases=['ops'], usage='?[ops|osuplays] <ник/id>',
-                      help='Команда для получения информации о лучших плеях игрока osu!standart')
-    async def ops_(self, ctx, *, nickname=''):
-        if not nickname:
-            return await ctx.send('Использование: ?[ops|osuplays] <ник/id>')
-        api_link = 'https://osu.ppy.sh/api/'
-        params = {
-            'k': osu_key,
-            'u': nickname
-        }
-        plays = requests.get(api_link + 'get_user_best', params=params, timeout=2).json()
-        if not plays:
-            return await ctx.send('Пользователь не найден')
-        embed = discord.Embed(description='Loading...')
-        msg = await ctx.send(ctx.author.mention, embed=embed)
-        embed = discord.Embed()
-        for i in range(len(plays)):
-            params = {
-                'k': osu_key,
-                'b': plays[i]['beatmap_id']
-            }
-            info = requests.get(api_link + 'get_beatmaps', params=params).json()[0]
-            accuracy = round(
-                (int(plays[i]['count300']) * 300 + int(plays[i]['count100']) * 100 + int(
-                    plays[i]['count50']) * 50) / (
-                        (int(plays[i]['count300']) + int(plays[i]['count100']) + int(plays[i]['count50'])) * 3), 2)
-            combo = '{:,} ({})'.format(int(plays[i]['maxcombo']),
-                                       'FC' if plays[i]['maxcombo'] == info['max_combo'] else info['max_combo'])
-            mods = str(osumods(int(plays[i]['enabled_mods']))).replace('osumods.', '', 1)
-            if 'NC' in mods:
-                mods = mods.replace('|DT', '')
-            if 'PF' in mods:
-                mods = mods.replace('|SD', '')
-            name = '{}. {} [{}] ({})'.format(i + 1, info['title'], info['version'], mods)
-            value = 'Score: {:,}; Combo: {}; PP: {:,}; Acc: {}%; Rank: {}'.format(int(plays[i]['score']), combo,
-                                                                                  round(float(plays[i]['pp']), 2),
-                                                                                  accuracy,
-                                                                                  plays[i]['rank'].replace('H', '',
-                                                                                                           1))
-            embed.add_field(name=name, value=value)
-        await msg.edit(content=ctx.author.mention, embed=embed)
-
-    @commands.command(name='link', usage='?link [канал]', help='Команда для генерации ссылки для создания видеозвонка'
+    @commands.command(name='link', usage='{}link [канал]', help='Команда для генерации ссылки для создания видеозвонка'
                                                                'из голосового канала')
     async def link_(self, ctx, *, channel=None):
         if channel is None:

@@ -1,4 +1,4 @@
-from utils import form
+from utils import form, get_prefix
 from discord.ext import commands
 import discord
 import json
@@ -89,7 +89,7 @@ class Cookies(commands.Cog):
             json.dump(cookies, open('resources/cookies.json', 'w'))
 
     @commands.command(name='cookies', aliases=['points'], help='Команда для отображения печенек',
-                      usage='?[cookies|points]')
+                      usage='{}[cookies|points]')
     async def cookies_(self, ctx):
         user = ctx.author
         cookies = get_cookies(user.id)
@@ -99,7 +99,7 @@ class Cookies(commands.Cog):
             'У {} {:,} {}'.format(user.mention, cookies, form(cookies, ['печенька', 'печеньки', 'печенек'])))
 
     @commands.command(name='leaderboard', aliases=['lb'], help='Команда для отображения топа печенек',
-                      usage='?[lb|leaderboard]')
+                      usage='{}[lb|leaderboard]')
     async def leaderboard_(self, ctx):
         cookies = json.load(open('resources/cookies.json', 'r'))
         cookies = sorted(cookies.items(), key=lambda kv: kv[1]['cookies'], reverse=True)
@@ -113,10 +113,11 @@ class Cookies(commands.Cog):
         return await ctx.send('{}'.format(ctx.author.mention), embed=embed)
 
     @commands.command(name='blackjack', aliases=['bj'], help='Команда для игры в Блэкджек',
-                      usage='?[bj|blackjack] <ставка>')
+                      usage='{}[bj|blackjack] <ставка>')
     async def bj_(self, ctx, amt: int = 0):
         if amt <= 0:
-            return await ctx.send('Использование: ?[bj|blackjack] <ставка>')
+            pref = await get_prefix(self.bot, ctx.message)
+            return await ctx.send(f'Использование: {pref}[bj|blackjack] <ставка>')
         user = ctx.author
         cookies = get_cookies(user.id)
         if cookies is None:
