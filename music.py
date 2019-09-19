@@ -187,10 +187,6 @@ class Music(commands.Cog):
     @commands.command(help='Команда для остановки плеера и очистки очереди', usage='{}stop')
     async def stop(self, ctx):
         player = self.bot.lavalink.players.get(ctx.guild.id)
-
-        if not player.is_playing:
-            return await ctx.send('Ничего не играет')
-
         player.queue.clear()
         await player.stop()
         await self.connect_to(ctx.guild.id, None)

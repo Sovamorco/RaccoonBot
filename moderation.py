@@ -2,6 +2,7 @@ from discord.ext import commands
 import discord
 from utils import form, get_prefix
 import json
+from time import time
 
 
 class Moderation(commands.Cog):
@@ -53,6 +54,16 @@ class Moderation(commands.Cog):
         pfxs[str(ctx.guild.id)] = pref
         json.dump(pfxs, open('resources/prefixes.json', 'w'))
         return await ctx.send('Префикс установлен на {}'.format(pref))
+
+    @commands.command(name='ping', pass_context=True, help='Команда для проверки жизнеспособности бота',
+                      usage='{}ping')
+    async def ping_(self, ctx):
+        embed = discord.Embed(description='Pong')
+        ts = time()
+        msg = await ctx.send(embed=embed)
+        tm = (time() - ts) * 1000
+        embed.description = '{:.2f}ms'.format(tm)
+        return await msg.edit(embed=embed)
 
 
 def mod_setup(bot):
