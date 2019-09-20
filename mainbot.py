@@ -58,7 +58,6 @@ async def on_raw_reaction_add(payload):
             role = discord.utils.get(guild.roles, name=emojitorole[payload.emoji.name])
             print(str(guild) + ' / ' + str(member) + ' / ' + str(role))
             await member.add_roles(role)
-        # Иначе
         else:
             channel = discord.utils.get(guild.channels, id=payload.channel_id)
             message = await channel.fetch_message(payload.message_id)

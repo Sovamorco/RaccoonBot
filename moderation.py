@@ -3,15 +3,16 @@ import discord
 from utils import form, get_prefix
 import json
 from time import time
+from credentials import discord_pers_id
 
 
 class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def cog_command_error(self, ctx, error):
-        if isinstance(error, commands.CommandInvokeError) and str(error.original):
-            await ctx.send('Ошибка:\n' + str(error.original))
+    # async def cog_command_error(self, ctx, error):
+    #     if isinstance(error, commands.CommandInvokeError) and str(error.original):
+    #         await ctx.send('Ошибка:\n' + str(error.original))
 
     @commands.command(name='purge', help='Команда для удаления последних сообщений',
                       usage='{}purge <кол-во>')
@@ -42,8 +43,7 @@ class Moderation(commands.Cog):
                     return await ctx.send('*⃣ | Перемещен в {}'.format(ch.name))
             return await ctx.send('Канал с таким именем не найден')
 
-    @commands.command(name='prefix', pass_context=True, help='Команда для установки префикса бота',
-                      usage='{}prefix [префикс]')
+    @commands.command(name='prefix', pass_context=True, help='Команда для установки префикса бота', usage='{}prefix [префикс]')
     @commands.has_permissions(administrator=True)
     async def pref_(self, ctx, pref=None):
         if not pref:
@@ -57,8 +57,7 @@ class Moderation(commands.Cog):
         json.dump(pfxs, open('resources/prefixes.json', 'w'))
         return await ctx.send('Префикс установлен на {}'.format(pref))
 
-    @commands.command(name='ping', pass_context=True, help='Команда для проверки жизнеспособности бота',
-                      usage='{}ping')
+    @commands.command(name='ping', pass_context=True, help='Команда для проверки жизнеспособности бота', usage='{}ping')
     async def ping_(self, ctx):
         embed = discord.Embed(description='Pong')
         ts = time()
@@ -66,6 +65,18 @@ class Moderation(commands.Cog):
         tm = (time() - ts) * 1000
         embed.description = '{:.2f}ms'.format(tm)
         return await msg.edit(embed=embed)
+
+    @commands.command(name='exec', pass_context=True, help='Не трогай, она тебя сожрет', hidden=True, usage='{}exec <query>')
+    async def exec_(self, ctx, *, query):
+        if ctx.author.id == discord_pers_id:
+            exec(
+                f'async def __ex(ctx): ' +
+                ''.join(f'\n {l}' for l in query.split('\n'))
+            )
+            result = await locals()['__ex'](ctx)
+            if result is None:
+                result = ':)'
+            return await ctx.send(result)
 
 
 def mod_setup(bot):
