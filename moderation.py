@@ -10,9 +10,9 @@ class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    # async def cog_command_error(self, ctx, error):
-    #     if isinstance(error, commands.CommandInvokeError) and str(error.original):
-    #         await ctx.send('Ошибка:\n' + str(error.original))
+    async def cog_command_error(self, ctx, error):
+        if isinstance(error, commands.CommandInvokeError) and str(error.original):
+            await ctx.send('Ошибка:\n' + str(error.original))
 
     @commands.command(name='purge', help='Команда для удаления последних сообщений',
                       usage='{}purge <кол-во>')
