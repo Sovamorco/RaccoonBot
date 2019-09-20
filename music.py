@@ -3,6 +3,7 @@ import re
 import random
 import json
 import requests
+import asyncio
 
 from tts import *
 from time import time
@@ -11,7 +12,7 @@ import lavalink
 from discord.ext import commands
 from bs4 import BeautifulSoup
 from utils import form, get_prefix
-from credentials import main_password, discord_pers_id, main_web_addr, gachi_things, genius_token, dev
+from credentials import main_password, discord_pers_id, main_web_addr, gachi_things, genius_token, dev, discord_guild_id
 
 url_rx = re.compile('https?://(?:www\\.)?.+')
 
@@ -26,6 +27,24 @@ class Music(commands.Cog):
             bot.lavalink = lavalink.Client(bot.user.id)
             bot.lavalink.add_node(addr, 2333, main_password, 'ru', 'default-node')
             bot.add_listener(bot.lavalink.voice_update_handler, 'on_socket_response')
+
+        self.bot.loop.create_task(self.set_volume())
+
+    async def set_volume(self):
+        vols = json.load(open('resources/volumes.json', 'r'))
+        while True:
+            try:
+                for guild in self.bot.guilds:
+                    player = self.bot.lavalink.players.create(guild.id, 'ru')
+                    if str(guild.id) not in vols.keys():
+                        vols[str(guild.id)] = 100
+                    elif vols[str(guild.id)] != 100:
+                        await player.set_volume(vols[str(guild.id)])
+                    json.dump(vols, open('resources/volumes.json', 'w'))
+            except lavalink.exceptions.NodeException:
+                await asyncio.sleep(1)
+            else:
+                break
 
     class musicCommandError(commands.CommandInvokeError):
         pass
@@ -130,18 +149,19 @@ class Music(commands.Cog):
         for track in tracks:
             player.add(requester=ctx.author.id, track=track)
 
-    @commands.command(help='Зачем', usage='{}why [кол-во]\n(Не используйте, пожалуйста)')
+    @commands.command(help='Зачем', usage='{}why [кол-во]\n(Не используйте, пожалуйста)', hidden=True)
     async def why(self, ctx, amt: int = 1):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
-        if (int(amt) > 20) and (ctx.author.id != discord_pers_id):
-            return await ctx.send('Нет')
-        query = 'why.mp3'
-        results = await player.node.get_tracks(query)
-        track = results['tracks'][0]
-        for i in range(int(amt)):
-            player.add(requester=ctx.author.id, track=track)
-        if not player.is_playing:
-            await player.play()
+        if ctx.guild.id == int(discord_guild_id):
+            player = self.bot.lavalink.players.get(ctx.guild.id)
+            if (int(amt) > 20) and (ctx.author.id != discord_pers_id):
+                return await ctx.send('Нет')
+            query = 'why.mp3'
+            results = await player.node.get_tracks(query)
+            track = results['tracks'][0]
+            for i in range(int(amt)):
+                player.add(requester=ctx.author.id, track=track)
+            if not player.is_playing:
+                await player.play()
 
     @commands.command(help='Команда для преобразования текста в голос', usage='{}tts <текст>')
     async def tts(self, ctx, *, text):
@@ -386,6 +406,9 @@ class Music(commands.Cog):
             return await ctx.send(f'🔈 | {player.volume}%')
         await player.set_volume(volume)
         await ctx.send(f'🔈 | Звук установлен на {player.volume}%')
+        vols = json.load(open('resources/volumes.json', 'r'))
+        vols[str(ctx.guild.id)] = player.volume
+        json.dump(vols, open('resources/volumes.json', 'w'))
 
     @commands.command(help='Команда для включения/выключения перемешивания очереди', usage='{}shuffle')
     async def shuffle(self, ctx):
