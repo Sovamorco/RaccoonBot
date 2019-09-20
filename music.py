@@ -33,6 +33,7 @@ class Music(commands.Cog):
     async def set_volume(self):
         vols = json.load(open('resources/volumes.json', 'r'))
         while True:
+            # noinspection PyUnresolvedReferences
             try:
                 for guild in self.bot.guilds:
                     player = self.bot.lavalink.players.create(guild.id, 'ru')

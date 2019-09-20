@@ -27,18 +27,20 @@ class Moderation(commands.Cog):
 
     @commands.command(usage='{}move <название канала>',
                       help='Команда для перемещения всех из одного канала в другой')
-    @commands.has_permissions(move_members=True)
     async def move(self, ctx, *, channel: str):
-        if ctx.author.voice.channel.name.lower() == channel.lower():
-            return await ctx.send('Уже подключен к голосовому каналу')
-        channels = await ctx.guild.fetch_channels()
-        for ch in channels:
-            if (ch.__class__ == discord.channel.VoiceChannel) and (ch.name.lower() == channel.lower()):
-                members = ctx.author.voice.channel.members
-                for member in members:
-                    await member.move_to(ch)
-                return await ctx.send('*⃣ | Перемещен в {}'.format(ch.name))
-        return await ctx.send('Канал с таким именем не найден')
+        if ctx.author.guild_permissions.move_members:
+            if ctx.author.voice is None:
+                return await ctx.send('Вы не подключены к голосовому каналу')
+            if ctx.author.voice.channel.name.lower() == channel.lower():
+                return await ctx.send('Уже подключен к голосовому каналу')
+            channels = await ctx.guild.fetch_channels()
+            for ch in channels:
+                if (ch.__class__ == discord.channel.VoiceChannel) and (ch.name.lower() == channel.lower()):
+                    members = ctx.author.voice.channel.members
+                    for member in members:
+                        await member.move_to(ch)
+                    return await ctx.send('*⃣ | Перемещен в {}'.format(ch.name))
+            return await ctx.send('Канал с таким именем не найден')
 
     @commands.command(name='prefix', pass_context=True, help='Команда для установки префикса бота',
                       usage='{}prefix [префикс]')
