@@ -48,6 +48,7 @@ class Music(commands.Cog):
             except lavalink.exceptions.NodeException:
                 await asyncio.sleep(1)
             else:
+                print('Initialized!')
                 break
 
     @commands.Cog.listener()
