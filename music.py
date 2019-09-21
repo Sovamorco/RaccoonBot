@@ -28,20 +28,22 @@ class Music(commands.Cog):
             bot.lavalink.add_node(addr, 2333, main_password, 'ru', 'default-node')
             bot.add_listener(bot.lavalink.voice_update_handler, 'on_socket_response')
 
-        self.bot.loop.create_task(self.set_volume())
+        self.bot.loop.create_task(self.initialize())
 
-    async def set_volume(self):
-        vols = json.load(open('resources/volumes.json', 'r'))
+    async def initialize(self):
+        saved = json.load(open('resources/saved.json', 'r'))
         while True:
             # noinspection PyUnresolvedReferences
             try:
                 for guild in self.bot.guilds:
                     player = self.bot.lavalink.players.create(guild.id, 'ru')
-                    if str(guild.id) not in vols.keys():
-                        vols[str(guild.id)] = 100
-                    elif vols[str(guild.id)] != 100:
-                        await player.set_volume(vols[str(guild.id)])
-                    json.dump(vols, open('resources/volumes.json', 'w'))
+                    if str(guild.id) not in saved.keys():
+                        saved[str(guild.id)]['volume'] = 100
+                        saved[str(guild.id)]['shuffle'] = False
+                    else:
+                        await player.set_volume(saved[str(guild.id)]['volume'])
+                        player.shuffle = saved[str(guild.id)]['shuffle']
+                    json.dump(saved, open('resources/saved.json', 'w'))
             except lavalink.exceptions.NodeException:
                 await asyncio.sleep(1)
             else:
@@ -407,16 +409,17 @@ class Music(commands.Cog):
             return await ctx.send(f'🔈 | {player.volume}%')
         await player.set_volume(volume)
         await ctx.send(f'🔈 | Звук установлен на {player.volume}%')
-        vols = json.load(open('resources/volumes.json', 'r'))
-        vols[str(ctx.guild.id)] = player.volume
-        json.dump(vols, open('resources/volumes.json', 'w'))
+        vols = json.load(open('resources/saved.json', 'r'))
+        vols[str(ctx.guild.id)]['volume'] = player.volume
+        json.dump(vols, open('resources/saved.json', 'w'))
 
     @commands.command(help='Команда для включения/выключения перемешивания очереди', usage='{}shuffle')
     async def shuffle(self, ctx):
         player = self.bot.lavalink.players.get(ctx.guild.id)
-        if not player.is_playing:
-            return await ctx.send('Ничего не играет')
         player.shuffle = not player.shuffle
+        shffl = json.load(open('resources/saved.json', 'r'))
+        shffl[str(ctx.guild.id)]['shuffle'] = player.shuffle
+        json.dump(shffl, open('resources/saved.json', 'w'))
         await ctx.send('🔀 | Перемешивание ' + ('включено' if player.shuffle else 'выключено'))
 
     @commands.command(aliases=['loop'], usage='{}[loop/repeat]',
@@ -462,7 +465,7 @@ class Music(commands.Cog):
     async def ensure_voice(self, ctx):
         player = self.bot.lavalink.players.create(ctx.guild.id, endpoint=str(ctx.guild.region))
         should_connect = ctx.command.name in ('play', 'join', 'why', 'tts', 'join', 'gachibass', 'move')
-        ignored = ctx.command.name in 'volume'
+        ignored = ctx.command.name in ['volume', 'shuffle']
         if ignored:
             return
         if not ctx.author.voice or not ctx.author.voice.channel:
