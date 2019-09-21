@@ -432,6 +432,12 @@ class Music(commands.Cog):
         json.dump(shffl, open('resources/saved.json', 'w'))
         await ctx.send('🔀 | Перемешивание ' + ('включено' if player.shuffle else 'выключено'))
 
+    @commands.command(help='Команда для перемешивания текущей очереди', aliases=['qs'], usage='{}[qshuffle|qs]')
+    async def qshuffle(self, ctx):
+        player = self.bot.lavalink.players.get(ctx.guild.id)
+        random.shuffle(player.queue)
+        await ctx.send('🔀 | Очередь перемешана')
+
     @commands.command(aliases=['loop'], usage='{}[loop/repeat]',
                       help='Команда для включения/выключения зацикливания очереди')
     async def repeat(self, ctx):
