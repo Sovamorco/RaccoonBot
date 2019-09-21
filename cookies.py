@@ -110,7 +110,7 @@ class Cookies(commands.Cog):
             amt = cookies[i][1]['cookies']
             embedValue += '{}. {}: {:,} {}\n\n'.format(i + 1, cookies[i][1]['name'], amt,
                                                        form(amt, ['печенька', 'печеньки', 'печенек']))
-        embed.add_field(name='Общий топ', value=embedValue)
+        embed.add_field(name='Глобальный топ', value=embedValue)
         embed.add_field(name='\u200b', value='\u200b')
         embedValue = ''
         i = 0
