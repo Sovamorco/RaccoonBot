@@ -2,6 +2,7 @@ from discord.ext import commands
 import discord
 from utils import form, get_prefix
 import json
+import os
 from time import time
 from credentials import discord_pers_id
 
@@ -77,6 +78,12 @@ class Moderation(commands.Cog):
             if result is None:
                 result = ':)'
             return await ctx.send(result)
+
+    @commands.command(name='upd', pass_context=True, help='Не трогай, она тебя сожрет', hidden=True, usage='{}upd')
+    async def upd_(self, ctx):
+        if ctx.author.id == discord_pers_id:
+            os.system('bash /home/mrdandycorn/update.sh')
+            os.system('pm2 reload 0')
 
 
 def mod_setup(bot):
