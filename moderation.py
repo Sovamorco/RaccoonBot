@@ -83,7 +83,7 @@ class Moderation(commands.Cog):
     async def upd_(self, ctx):
         if ctx.author.id == discord_pers_id:
             os.system('bash /home/mrdandycorn/update.sh')
-            os.system('pm2 reload 0')
+            os.system('pm2 reload RaccoonBot')
 
 
 def mod_setup(bot):
