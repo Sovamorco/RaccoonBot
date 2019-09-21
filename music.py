@@ -377,82 +377,108 @@ class Music(commands.Cog):
         embed = discord.Embed(colour=discord.Color.blurple(),
                               description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
         msg = await ctx.send(embed=embed)
-        if pages > 1:
-            def verify(react, member):
-                return (react.message.id == msg.id) and (member != self.bot.user)
 
-            page = 1
+        def verify(react, member):
+            return (react.message.id == msg.id) and (member != self.bot.user)
+
+        page = 1
+        await msg.add_reaction('❌')
+        await msg.add_reaction('🔄')
+        if pages > 1:
             await msg.add_reaction('▶')
             await msg.add_reaction('⏭')
-            await msg.add_reaction('❌')
-            while True:
-                reaction, user = await self.bot.wait_for('reaction_add', check=verify)
-                if str(reaction.emoji) == '▶':
-                    page += 1
-                    start = (page - 1) * items_per_page
-                    end = start + items_per_page
-                    queue_list = ''
-                    for index, track in enumerate(local_queue[start:end], start=start):
-                        queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
-                    embed = discord.Embed(colour=discord.Color.blurple(),
-                                          description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
-                    await msg.edit(embed=embed)
-                    await msg.clear_reactions()
-                    await msg.add_reaction('⏮')
-                    await msg.add_reaction('◀')
-                    if page != pages:
-                        await msg.add_reaction('▶')
-                        await msg.add_reaction('⏭')
-                    await msg.add_reaction('❌')
-                elif str(reaction.emoji) == '⏭':
-                    page = pages
-                    start = (page - 1) * items_per_page
-                    end = start + items_per_page
-                    queue_list = ''
-                    for index, track in enumerate(local_queue[start:end], start=start):
-                        queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
-                    embed = discord.Embed(colour=discord.Color.blurple(),
-                                          description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
-                    await msg.edit(embed=embed)
-                    await msg.clear_reactions()
-                    await msg.add_reaction('⏮')
-                    await msg.add_reaction('◀')
-                    await msg.add_reaction('❌')
-                elif str(reaction.emoji) == '◀':
-                    page -= 1
-                    start = (page - 1) * items_per_page
-                    end = start + items_per_page
-                    queue_list = ''
-                    for index, track in enumerate(local_queue[start:end], start=start):
-                        queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
-                    embed = discord.Embed(colour=discord.Color.blurple(),
-                                          description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
-                    await msg.edit(embed=embed)
-                    await msg.clear_reactions()
-                    if page != 1:
-                        await msg.add_reaction('⏮')
-                        await msg.add_reaction('◀')
+        while True:
+            try:
+                reaction, user = await self.bot.wait_for('reaction_add', check=verify, timeout=1200)
+            except asyncio.TimeoutError:
+                return
+            if str(reaction.emoji) == '▶' and page < pages:
+                page += 1
+                start = (page - 1) * items_per_page
+                end = start + items_per_page
+                queue_list = ''
+                for index, track in enumerate(local_queue[start:end], start=start):
+                    queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
+                embed = discord.Embed(colour=discord.Color.blurple(),
+                                      description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
+                await msg.edit(embed=embed)
+                await reaction.remove(user)
+                await msg.add_reaction('⏮')
+                await msg.add_reaction('◀')
+                if page == pages:
+                    await msg.remove_reaction('▶', self.bot.user)
+                    await msg.remove_reaction('⏭', self.bot.user)
+                await msg.add_reaction('❌')
+            elif str(reaction.emoji) == '⏭' and page < pages:
+                page = pages
+                start = (page - 1) * items_per_page
+                end = start + items_per_page
+                queue_list = ''
+                for index, track in enumerate(local_queue[start:end], start=start):
+                    queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
+                embed = discord.Embed(colour=discord.Color.blurple(),
+                                      description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
+                await msg.edit(embed=embed)
+                await reaction.remove(user)
+                await msg.add_reaction('⏮')
+                await msg.add_reaction('◀')
+                await msg.add_reaction('❌')
+                await msg.remove_reaction('▶', self.bot.user)
+                await msg.remove_reaction('⏭', self.bot.user)
+            elif str(reaction.emoji) == '◀' and page > 1:
+                page -= 1
+                start = (page - 1) * items_per_page
+                end = start + items_per_page
+                queue_list = ''
+                for index, track in enumerate(local_queue[start:end], start=start):
+                    queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
+                embed = discord.Embed(colour=discord.Color.blurple(),
+                                      description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
+                await msg.edit(embed=embed)
+                await reaction.remove(user)
+                if page == 1:
+                    await msg.remove_reaction('⏮', self.bot.user)
+                    await msg.remove_reaction('◀', self.bot.user)
+                await msg.add_reaction('▶')
+                await msg.add_reaction('⏭')
+                await msg.add_reaction('❌')
+            elif str(reaction.emoji) == '⏮' and page > 1:
+                page = 1
+                start = (page - 1) * items_per_page
+                end = start + items_per_page
+                queue_list = ''
+                for index, track in enumerate(local_queue[start:end], start=start):
+                    queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
+                embed = discord.Embed(colour=discord.Color.blurple(),
+                                      description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
+                await msg.edit(embed=embed)
+                await reaction.remove(user)
+                await msg.add_reaction('▶')
+                await msg.add_reaction('⏭')
+                await msg.add_reaction('❌')
+                await msg.remove_reaction('⏮', self.bot.user)
+                await msg.remove_reaction('◀', self.bot.user)
+            elif str(reaction.emoji) == '❌':
+                return await msg.delete()
+            elif str(reaction.emoji) == '🔄':
+                items_per_page = 10
+                local_queue = player.queue.copy()
+                pages = math.ceil(len(player.queue) / items_per_page)
+                queue_list = ''
+                for index, track in enumerate(local_queue[0:10], start=0):
+                    queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
+                embed = discord.Embed(colour=discord.Color.blurple(),
+                                      description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
+                page = 1
+                await msg.edit(embed=embed)
+                await msg.clear_reactions()
+                await msg.add_reaction('❌')
+                await msg.add_reaction('🔄')
+                if pages > 1:
                     await msg.add_reaction('▶')
                     await msg.add_reaction('⏭')
-                    await msg.add_reaction('❌')
-                elif str(reaction.emoji) == '⏮':
-                    page = 1
-                    start = (page - 1) * items_per_page
-                    end = start + items_per_page
-                    queue_list = ''
-                    for index, track in enumerate(local_queue[start:end], start=start):
-                        queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
-                    embed = discord.Embed(colour=discord.Color.blurple(),
-                                          description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
-                    await msg.edit(embed=embed)
-                    await msg.clear_reactions()
-                    await msg.add_reaction('▶')
-                    await msg.add_reaction('⏭')
-                    await msg.add_reaction('❌')
-                elif str(reaction.emoji) == '❌':
-                    return await msg.delete()
-                else:
-                    await reaction.remove(user)
+            else:
+                await reaction.remove(user)
 
     @commands.command(aliases=['resume'], usage='{}[pause|resume]',
                       help='Команда для приостановки или продолжения поспроизведения воспроизведения')
