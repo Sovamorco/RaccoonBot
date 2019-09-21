@@ -117,7 +117,7 @@ class Cookies(commands.Cog):
         for holder in cookies:
             if ctx.guild.get_member(holder[1]['id']) is not None:
                 amt = holder[1]['cookies']
-                embedValue += '{}. {}: {:,} {}\n\n'.format(i + 1, cookies[i][1]['name'], amt,
+                embedValue += '{}. {}: {:,} {}\n\n'.format(i + 1, holder[1]['name'], amt,
                                                            form(amt, ['печенька', 'печеньки', 'печенек']))
                 i += 1
                 if i == length:
