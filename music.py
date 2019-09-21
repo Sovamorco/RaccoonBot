@@ -38,6 +38,7 @@ class Music(commands.Cog):
                 for guild in self.bot.guilds:
                     player = self.bot.lavalink.players.create(guild.id, 'ru')
                     if str(guild.id) not in saved.keys():
+                        saved[str(guild.id)] = {}
                         saved[str(guild.id)]['volume'] = 100
                         saved[str(guild.id)]['shuffle'] = False
                     else:
@@ -48,6 +49,15 @@ class Music(commands.Cog):
                 await asyncio.sleep(1)
             else:
                 break
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild):
+        saved = json.load(open('resources/saved.json', 'r'))
+        saved[str(guild.id)] = {}
+        saved[str(guild.id)]['volume'] = 100
+        saved[str(guild.id)]['shuffle'] = False
+        json.dump(saved, open('resources/saved.json', 'w'))
+        return
 
     class musicCommandError(commands.CommandInvokeError):
         pass
