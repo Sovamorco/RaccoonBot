@@ -104,12 +104,25 @@ class Cookies(commands.Cog):
         cookies = json.load(open('resources/cookies.json', 'r'))
         cookies = sorted(cookies.items(), key=lambda kv: kv[1]['cookies'], reverse=True)
         length = 10 if len(cookies) > 10 else len(cookies)
+        embed = discord.Embed()
         embedValue = ''
         for i in range(length):
             amt = cookies[i][1]['cookies']
             embedValue += '{}. {}: {:,} {}\n\n'.format(i + 1, cookies[i][1]['name'], amt,
                                                        form(amt, ['печенька', 'печеньки', 'печенек']))
-        embed = discord.Embed(title='Топ печенек', description=embedValue)
+        embed.add_field(name='Общий топ', value=embedValue)
+        embed.add_field(name='\u200b', value='\u200b')
+        embedValue = ''
+        i = 0
+        for holder in cookies:
+            if ctx.guild.get_member(holder[1]['id']) is not None:
+                amt = holder[1]['cookies']
+                embedValue += '{}. {}: {:,} {}\n\n'.format(i + 1, cookies[i][1]['name'], amt,
+                                                           form(amt, ['печенька', 'печеньки', 'печенек']))
+                i += 1
+                if i == length:
+                    break
+        embed.add_field(name='Топ сервера', value=embedValue)
         return await ctx.send('{}'.format(ctx.author.mention), embed=embed)
 
     @commands.command(name='blackjack', aliases=['bj'], help='Команда для игры в Блэкджек',
