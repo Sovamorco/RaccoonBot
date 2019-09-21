@@ -435,6 +435,8 @@ class Music(commands.Cog):
     @commands.command(help='Команда для перемешивания текущей очереди', aliases=['qs'], usage='{}[qshuffle|qs]')
     async def qshuffle(self, ctx):
         player = self.bot.lavalink.players.get(ctx.guild.id)
+        if not player.queue:
+            return await ctx.send('Очередь пустая')
         random.shuffle(player.queue)
         await ctx.send('🔀 | Очередь перемешана')
 
