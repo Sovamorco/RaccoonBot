@@ -537,7 +537,7 @@ class Music(commands.Cog):
 
     async def ensure_voice(self, ctx):
         player = self.bot.lavalink.players.create(ctx.guild.id, endpoint=str(ctx.guild.region))
-        should_connect = ctx.command.name in ('play', 'join', 'why', 'tts', 'join', 'gachibass', 'move')
+        should_connect = ctx.command.name in ('play', 'force', 'join', 'why', 'tts', 'join', 'gachibass', 'move')
         ignored = ctx.command.name in ['volume', 'shuffle']
         if ignored:
             return
