@@ -319,8 +319,7 @@ class Misc(commands.Cog):
         except requests.exceptions.ConnectTimeout:
             await ctx.send('Не удалось подключиться к Wikia')
 
-    @commands.command(aliases=['l'], usage='{}[l|lyrics] <запрос>',
-                      help='Команда для отображения текста текущего трека')
+    @commands.command(aliases=['l'], usage='{}[l|lyrics] <запрос>', help='Команда для поиска текста песен')
     async def lyrics(self, ctx, *, title=None):
         pref = await get_prefix(self.bot, ctx.message)
         if title is None:
@@ -395,8 +394,7 @@ class Misc(commands.Cog):
                                       title='Текст ' + title, description=lyrics)
                 return await ctx.send(embed=embed)
 
-    @commands.command(name='link', usage='{}link [канал]', help='Команда для генерации ссылки для создания видеозвонка'
-                                                               'из голосового канала')
+    @commands.command(name='link', usage='{}link [канал]', help='Команда для генерации ссылки для создания видеозвонка из голосового канала')
     async def link_(self, ctx, *, channel=None):
         if channel is None:
             if not ctx.author.voice or not ctx.author.voice.channel:
