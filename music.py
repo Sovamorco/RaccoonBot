@@ -12,7 +12,8 @@ import lavalink
 from discord.ext import commands
 from bs4 import BeautifulSoup
 from utils import form, get_prefix
-from credentials import main_password, discord_pers_id, main_web_addr, gachi_things, genius_token, dev, discord_guild_id
+from credentials import main_password, discord_pers_id, main_web_addr, gachi_things, genius_token, dev, discord_guild_id,\
+    discord_inter_guild_id, discord_inter_afk_channel_id, discord_dev_guild_id, discord_dev_afk_channel_id, discord_afk_music
 
 url_rx = re.compile('https?://(?:www\\.)?.+')
 
@@ -21,6 +22,8 @@ url_rx = re.compile('https?://(?:www\\.)?.+')
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.afk_guild = discord_dev_guild_id if dev else discord_inter_guild_id
+        self.afk_channel = discord_dev_afk_channel_id if dev else discord_inter_afk_channel_id
 
         if not hasattr(bot, 'lavalink'):
             addr = main_web_addr if dev else '127.0.0.1'
@@ -44,6 +47,14 @@ class Music(commands.Cog):
                     else:
                         await player.set_volume(saved[str(guild.id)]['volume'])
                         player.shuffle = saved[str(guild.id)]['shuffle']
+                    if guild.id == self.afk_guild:
+                        vc = self.bot.get_channel(self.afk_channel)
+                        if vc.members:
+                            await self.connect_to(self.afk_guild, self.afk_channel)
+                            results = await player.node.get_tracks(discord_afk_music)
+                            track = results['tracks'][0]
+                            player.add(requester=self.bot.user.id, track=track)
+                            await player.play()
                     json.dump(saved, open('resources/saved.json', 'w'))
             except lavalink.exceptions.NodeException:
                 await asyncio.sleep(1)
@@ -58,6 +69,30 @@ class Music(commands.Cog):
         saved[str(guild.id)]['volume'] = 100
         saved[str(guild.id)]['shuffle'] = False
         json.dump(saved, open('resources/saved.json', 'w'))
+        return
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        if member.guild.id == self.afk_guild and member.id != self.bot.user.id and after.channel and after.channel.id == self.afk_channel:
+            if before.channel and before.channel.id == self.afk_channel:
+                return
+            player = self.bot.lavalink.players.get(member.guild.id)
+            if not player.is_connected or self.bot.user in after.channel.members:
+                await self.connect_to(member.guild.id, after.channel.id)
+                if player.current:
+                    await player.skip()
+                player.queue.clear()
+                results = await player.node.get_tracks(discord_afk_music)
+                track = results['tracks'][0]
+                player.add(requester=member.id, track=track)
+                return await player.play()
+        elif member.guild.id == self.afk_guild and member.id != self.bot.user.id and before.channel and before.channel.id == self.afk_channel:
+            player = self.bot.lavalink.players.get(member.guild.id)
+            if player.is_connected and self.bot.user in before.channel.members:
+                player.queue.clear()
+                if player.current:
+                    await player.skip()
+                return await self.connect_to(member.guild.id, None)
         return
 
     class musicCommandError(commands.CommandInvokeError):
