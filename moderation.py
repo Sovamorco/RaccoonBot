@@ -82,6 +82,8 @@ class Moderation(commands.Cog):
     @commands.command(name='upd', pass_context=True, help='Не трогай, она тебя сожрет', hidden=True, usage='{}upd')
     async def upd_(self, ctx):
         if ctx.author.id == discord_pers_id:
+            activity = discord.Streaming(name='Updating...', url='https://twitch.tv/mrdandycorn')
+            await self.bot.change_presence(activity=activity)
             os.system('bash /home/mrdandycorn/update.sh')
             os.system('pm2 reload RaccoonBot')
 
