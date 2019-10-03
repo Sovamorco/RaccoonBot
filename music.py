@@ -73,27 +73,9 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
-        if member.guild.id == self.afk_guild and member.id != self.bot.user.id and after.channel and after.channel.id == self.afk_channel:
-            if before.channel and before.channel.id == self.afk_channel:
-                return
-            player = self.bot.lavalink.players.get(member.guild.id)
-            if not player.is_connected or self.bot.user in after.channel.members:
-                await self.connect_to(member.guild.id, after.channel.id)
-                if player.current:
-                    await player.skip()
-                player.queue.clear()
-                results = await player.node.get_tracks(discord_afk_music)
-                track = results['tracks'][0]
-                player.add(requester=member.id, track=track)
-                return await player.play()
-        elif member.guild.id == self.afk_guild and member.id != self.bot.user.id and before.channel and before.channel.id == self.afk_channel:
-            player = self.bot.lavalink.players.get(member.guild.id)
-            if player.is_connected and self.bot.user in before.channel.members:
-                player.queue.clear()
-                if player.current:
-                    await player.skip()
-                return await self.connect_to(member.guild.id, None)
-        return
+        if member.guild.id == self.afk_guild and member.id != self.bot.user.id:
+            if after.channel and after.channel.id == self.afk_channel and before.channel and before.channel.id != after.channel.id:
+                return await member.send('Вы были перемещены в АФК-канал')
 
     class musicCommandError(commands.CommandInvokeError):
         pass
