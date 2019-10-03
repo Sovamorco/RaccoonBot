@@ -47,14 +47,6 @@ class Music(commands.Cog):
                     else:
                         await player.set_volume(saved[str(guild.id)]['volume'])
                         player.shuffle = saved[str(guild.id)]['shuffle']
-                    if guild.id == self.afk_guild:
-                        vc = self.bot.get_channel(self.afk_channel)
-                        if vc.members:
-                            await self.connect_to(self.afk_guild, self.afk_channel)
-                            results = await player.node.get_tracks(discord_afk_music)
-                            track = results['tracks'][0]
-                            player.add(requester=self.bot.user.id, track=track)
-                            await player.play()
                     json.dump(saved, open('resources/saved.json', 'w'))
             except lavalink.exceptions.NodeException:
                 await asyncio.sleep(1)
@@ -120,12 +112,12 @@ class Music(commands.Cog):
         results = await player.node.get_tracks(query)
         if not results or not results['tracks']:
             return await ctx.send('Ничего не найдено')
-        embed = discord.Embed(color=discord.Color.blurple())
+        embed = discord.Embed(color=discord.Color.dark_purple())
         if results['loadType'] == 'PLAYLIST_LOADED':
             tracks = results['tracks']
             for track in tracks:
                 player.add(requester=ctx.author.id, track=track)
-            embed.title = 'Плейлист добавлен'
+            embed.title = '✅Плейлист добавлен'
             embed.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} {form(len(tracks), ["трек", "трека", "треков"])}'
         else:
             if url_rx.match(query):
@@ -140,7 +132,7 @@ class Music(commands.Cog):
                     title = tracks[i]['info']['title']
                     embedValue += '{}: {}\n'.format(i + 1, title)
                 choiceEmbed = discord.Embed(title="Выберите трек", description=embedValue,
-                                            color=discord.Color.blurple())
+                                            color=discord.Color.dark_purple())
                 choiceEmbed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
                 choice = await ctx.send(embed=choiceEmbed, delete_after=30)
                 canc = False
@@ -158,7 +150,7 @@ class Music(commands.Cog):
                     return await choice.delete()
                 track = tracks[int(msg.content) - 1]
                 await choice.delete()
-            embed.title = 'Трек добавлен'
+            embed.title = '✅Трек добавлен'
             embed.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
             player.add(requester=ctx.author.id, track=track)
         await ctx.send(embed=embed)
@@ -177,12 +169,12 @@ class Music(commands.Cog):
         results = await player.node.get_tracks(query)
         if not results or not results['tracks']:
             return await ctx.send('Ничего не найдено')
-        embed = discord.Embed(color=discord.Color.blurple())
+        embed = discord.Embed(color=discord.Color.dark_purple())
         if results['loadType'] == 'PLAYLIST_LOADED':
             tracks = results['tracks']
             for track in reversed(tracks):
                 player.add(requester=ctx.author.id, track=track, index=0)
-            embed.title = 'Плейлист добавлен'
+            embed.title = '✅Плейлист добавлен'
             embed.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} {form(len(tracks), ["трек", "трека", "треков"])}'
         else:
             if url_rx.match(query):
@@ -197,7 +189,7 @@ class Music(commands.Cog):
                     title = tracks[i]['info']['title']
                     embedValue += '{}: {}\n'.format(i + 1, title)
                 choiceEmbed = discord.Embed(title="Выберите трек", description=embedValue,
-                                            color=discord.Color.blurple())
+                                            color=discord.Color.dark_purple())
                 choiceEmbed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
                 choice = await ctx.send(embed=choiceEmbed, delete_after=30)
                 canc = False
@@ -215,7 +207,7 @@ class Music(commands.Cog):
                     return await choice.delete()
                 track = tracks[int(msg.content) - 1]
                 await choice.delete()
-            embed.title = 'Трек добавлен'
+            embed.title = '✅Трек добавлен'
             embed.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
             player.add(requester=ctx.author.id, track=track, index=0)
         await ctx.send(embed=embed)
@@ -275,7 +267,7 @@ class Music(commands.Cog):
         track_time = player.position + (seconds * 1000)
         await player.seek(track_time)
 
-        await ctx.send(f'Переместился на **{lavalink.utils.format_time(track_time)}**')
+        await ctx.message.add_reaction('👌')
 
     @commands.command(help='Команда для пропуска трека', usage='{}skip')
     async def skip(self, ctx):
@@ -285,13 +277,13 @@ class Music(commands.Cog):
             return await ctx.send('Ничего не играет')
 
         await player.skip()
-        track = ''
-        if player.queue:
+        if player.queue or player.current:
             while not player.is_playing:
                 pass
             cur = player.current
-            track = '\nДальше: {}'.format(cur.title if not cur.title == 'Unknown title' else cur.identifier)
-        await ctx.send('⏭ | Трек пропущен' + track)
+            track = 'Дальше: {}'.format(cur.title if not cur.title == 'Unknown title' else cur.identifier)
+            await ctx.send(track)
+        await ctx.message.add_reaction('👌')
 
     @commands.command(help='Команда для остановки плеера и очистки очереди', usage='{}stop')
     async def stop(self, ctx):
@@ -299,7 +291,7 @@ class Music(commands.Cog):
         player.queue.clear()
         await player.stop()
         await self.connect_to(ctx.guild.id, None)
-        await ctx.send('⏹ | Плеер остановлен')
+        await ctx.message.add_reaction('👌')
 
     @commands.command(help='Команда для очистки очереди плеера', usage='{}clear')
     async def clear(self, ctx):
@@ -309,7 +301,7 @@ class Music(commands.Cog):
             return await ctx.send('Очередь пустая')
 
         player.queue.clear()
-        await ctx.send('⭕ | Очередь очищена')
+        await ctx.message.add_reaction('👌')
 
     @commands.command(aliases=['n', 'np', 'playing', 'current'], usage='{}[np|now|playing|current]',
                       help='Команда для отображения текущего трека')
@@ -324,7 +316,7 @@ class Music(commands.Cog):
             duration = lavalink.utils.format_time(player.current.duration)
         song = f'**[{player.current.title}]({player.current.uri})**\n({position}/{duration})'
 
-        embed = discord.Embed(color=discord.Color.blurple(),
+        embed = discord.Embed(color=discord.Color.dark_purple(),
                               title='Сейчас играет', description=song)
         await ctx.send(embed=embed)
 
@@ -364,17 +356,17 @@ class Music(commands.Cog):
                         for i in range(len(lyrlist)):
                             lyrics += lyrlist[i] + '\n'
                             if i < len(lyrlist) - 1 and len(lyrics + lyrlist[i + 1]) > 2000:
-                                embed = discord.Embed(color=discord.Color.blurple(),
+                                embed = discord.Embed(color=discord.Color.dark_purple(),
                                                       title='Текст {} ({})'.format(title, it), description=lyrics)
                                 await ctx.send(embed=embed)
                                 lyrics = ''
                                 it += 1
                             elif i == len(lyrlist) - 1:
-                                embed = discord.Embed(color=discord.Color.blurple(),
+                                embed = discord.Embed(color=discord.Color.dark_purple(),
                                                       title='Текст {} ({})'.format(title, it), description=lyrics)
                                 return await ctx.send(embed=embed)
                     else:
-                        embed = discord.Embed(color=discord.Color.blurple(),
+                        embed = discord.Embed(color=discord.Color.dark_purple(),
                                               title='Текст '+title, description=lyrics)
                         return await ctx.send(embed=embed)
                 else:
@@ -394,7 +386,7 @@ class Music(commands.Cog):
         queue_list = ''
         for index, track in enumerate(local_queue[0:10], start=0):
             queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
-        embed = discord.Embed(colour=discord.Color.blurple(),
+        embed = discord.Embed(color=discord.Color.dark_purple(),
                               description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
         msg = await ctx.send(embed=embed)
 
@@ -419,7 +411,7 @@ class Music(commands.Cog):
                 queue_list = ''
                 for index, track in enumerate(local_queue[start:end], start=start):
                     queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
-                embed = discord.Embed(colour=discord.Color.blurple(),
+                embed = discord.Embed(color=discord.Color.dark_purple(),
                                       description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
                 await msg.edit(embed=embed)
                 await reaction.remove(user)
@@ -436,7 +428,7 @@ class Music(commands.Cog):
                 queue_list = ''
                 for index, track in enumerate(local_queue[start:end], start=start):
                     queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
-                embed = discord.Embed(colour=discord.Color.blurple(),
+                embed = discord.Embed(color=discord.Color.dark_purple(),
                                       description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
                 await msg.edit(embed=embed)
                 await reaction.remove(user)
@@ -452,7 +444,7 @@ class Music(commands.Cog):
                 queue_list = ''
                 for index, track in enumerate(local_queue[start:end], start=start):
                     queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
-                embed = discord.Embed(colour=discord.Color.blurple(),
+                embed = discord.Embed(color=discord.Color.dark_purple(),
                                       description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
                 await msg.edit(embed=embed)
                 await reaction.remove(user)
@@ -469,7 +461,7 @@ class Music(commands.Cog):
                 queue_list = ''
                 for index, track in enumerate(local_queue[start:end], start=start):
                     queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
-                embed = discord.Embed(colour=discord.Color.blurple(),
+                embed = discord.Embed(color=discord.Color.dark_purple(),
                                       description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
                 await msg.edit(embed=embed)
                 await reaction.remove(user)
@@ -487,7 +479,7 @@ class Music(commands.Cog):
                 queue_list = ''
                 for index, track in enumerate(local_queue[0:10], start=0):
                     queue_list += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
-                embed = discord.Embed(colour=discord.Color.blurple(),
+                embed = discord.Embed(color=discord.Color.dark_purple(),
                                       description=f'**{len(local_queue)} {form(len(local_queue), ["трек", "трека", "треков"])}**\n\n{queue_list}')
                 page = 1
                 await msg.edit(embed=embed)
@@ -506,12 +498,8 @@ class Music(commands.Cog):
         player = self.bot.lavalink.players.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет')
-        if player.paused:
-            await player.set_pause(False)
-            await ctx.send('⏯ | Воспроизведение возобновлено')
-        else:
-            await player.set_pause(True)
-            await ctx.send('⏯ | Воспроизведение приостановлено')
+        await player.set_pause(not player.paused)
+        await ctx.message.add_reaction('⏸' if player.paused else '▶')
 
     @commands.command(aliases=['vol'], help='Команда для изменения громкости плеера',
                       usage='{}[vol|volume] <громкость(1-1000)>')
@@ -520,7 +508,7 @@ class Music(commands.Cog):
         if not volume:
             return await ctx.send(f'🔈 | {player.volume}%')
         await player.set_volume(volume)
-        await ctx.send(f'🔈 | Звук установлен на {player.volume}%')
+        await ctx.message.add_reaction('👌')
         vols = json.load(open('resources/saved.json', 'r'))
         vols[str(ctx.guild.id)]['volume'] = player.volume
         json.dump(vols, open('resources/saved.json', 'w'))
@@ -540,7 +528,7 @@ class Music(commands.Cog):
         if not player.queue:
             return await ctx.send('Очередь пустая')
         random.shuffle(player.queue)
-        await ctx.send('🔀 | Очередь перемешана')
+        await ctx.message.add_reaction('👌')
 
     @commands.command(aliases=['loop'], usage='{}[loop/repeat]',
                       help='Команда для включения/выключения зацикливания очереди')
@@ -559,7 +547,8 @@ class Music(commands.Cog):
         if index > len(player.queue) or index < 1:
             return await ctx.send(f'Индекс дожен быть **между** 1 и {len(player.queue)}')
         removed = player.queue.pop(index - 1)
-        await ctx.send(f'**{removed.title}** удален из очереди')
+        embed = discord.Embed(color=discord.Color.dark_purple(), title='❌Трек удален', description=f'[{removed.title}]({removed.uri})')
+        await ctx.send(embed=embed)
 
     @commands.command(aliases=['dc', 'leave'], help='Команда для отключения бота от голосового канала',
                       usage='{}[dc|disconnect|leave]')
@@ -570,7 +559,7 @@ class Music(commands.Cog):
         player.queue.clear()
         await player.stop()
         await self.connect_to(ctx.guild.id, None)
-        await ctx.send('*⃣ | Отключен')
+        await ctx.message.add_reaction('👌')
 
     @commands.command(aliases=['connect', 'c'], usage='{}[c|connect|join]',
                       help='Команда для подключения бота к голосовому каналу')
@@ -580,7 +569,7 @@ class Music(commands.Cog):
             if ctx.author.voice.channel.id == int(player.channel_id):
                 return await ctx.send('Уже подключен к голосовому каналу')
         await self.connect_to(ctx.guild.id, ctx.author.voice.channel.id)
-        await ctx.send('*⃣ | Подключен к {}'.format(ctx.author.voice.channel))
+        await ctx.message.add_reaction('👌')
 
     async def ensure_voice(self, ctx):
         player = self.bot.lavalink.players.create(ctx.guild.id, endpoint=str(ctx.guild.region))
