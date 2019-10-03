@@ -8,6 +8,9 @@ from credentials import genius_token
 from bs4 import BeautifulSoup
 import re
 from utils import get_prefix
+import os
+import time
+import git
 
 proxies = {
     'http': 'socks4://91.83.227.147:57276',
@@ -407,6 +410,21 @@ class Misc(commands.Cog):
                 embed = discord.Embed(description='[Магическая ссылка для канала {}]({})'.format(ch.name, link))
                 return await ctx.send(embed=embed)
         return await ctx.send('Канал с таким именем не найден')
+
+    @commands.command(name='changelog', usage='{}changelog', help='Команда, показывающая последние обновления бота')
+    async def changelog_(self, ctx):
+        repo = git.Repo(os.getcwd())
+        commits = list(repo.iter_commits('master'))
+        cnt = 0
+        unique = []
+        embed = discord.Embed(color=discord.Color.dark_purple(), title='Последние изменения', description='')
+        for commit in commits:
+            if commit.message not in unique:
+                unique.append(commit.message)
+                cnt += 1
+                embed.description += f'\n{time.strftime("%d-%m-%Y", time.gmtime(commit.authored_date - commit.author_tz_offset))}: {commit.message.strip()}'
+            if cnt == 10:
+                return await ctx.send(embed=embed)
 
 
 def misc_setup(bot):
