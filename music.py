@@ -73,7 +73,10 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
-        if member.guild.id == self.afk_guild and member.id != self.bot.user.id:
+        if not after.channel and before.channel:
+            if any(self.bot.user in channel.members and all(member.bot for member in channel.members) for channel in member.guild.voice_channels):
+                await self.connect_to(member.guild.id, None)
+        if member.guild.id == self.afk_guild and not member.bot:
             if after.channel and after.channel.id == self.afk_channel and before.channel and before.channel.id != after.channel.id:
                 return await member.send('Вы были перемещены в АФК-канал')
 
