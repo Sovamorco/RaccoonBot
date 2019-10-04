@@ -71,7 +71,7 @@ class Games(commands.Cog):
         result = r[0]
         if result['playcount'] is None:
             return await ctx.send('Слишком мало информации по пользователю')
-        embed = discord.Embed(title=result['username'], url='https://osu.ppy.sh/users/{}'.format(result['user_id']))
+        embed = discord.Embed(color=discord.Color.dark_purple(), title=result['username'], url='https://osu.ppy.sh/users/{}'.format(result['user_id']))
         embed.set_thumbnail(url='https://a.ppy.sh/{}'.format(result['user_id']))
         embed.add_field(name='Rank', value='{:,}'.format(int(result['pp_rank'])))
         embed.add_field(name='Country rank :flag_{}:'.format(result['country'].lower()),
@@ -98,9 +98,9 @@ class Games(commands.Cog):
         plays = requests.get(api_link + 'get_user_best', params=params, timeout=2).json()
         if not plays:
             return await ctx.send('Пользователь не найден')
-        embed = discord.Embed(description='Loading...')
+        embed = discord.Embed(color=discord.Color.dark_purple(), description='Loading...')
         msg = await ctx.send(ctx.author.mention, embed=embed)
-        embed = discord.Embed()
+        embed = discord.Embed(color=discord.Color.dark_purple())
         for i in range(len(plays)):
             params = {
                 'k': osu_key,
@@ -150,7 +150,7 @@ class Games(commands.Cog):
                 content = ''
                 for i in range(len(results)):
                     content += '{}. {}\n'.format(i+1, results[i]['name'])
-                embed = discord.Embed(title='Выберите карту', description=content)
+                embed = discord.Embed(color=discord.Color.dark_purple(), title='Выберите карту', description=content)
                 embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
                 choice = await ctx.send(embed=embed)
                 canc = False
@@ -170,7 +170,7 @@ class Games(commands.Cog):
                 if int(msg.content) == 0:
                     return await choice.delete()
                 result = results[int(msg.content)-1]
-            embed = discord.Embed(title=result['name'], url='https://sv.bagoum.com/cards/{}'.format(result['id']))
+            embed = discord.Embed(color=discord.Color.dark_purple(), title=result['name'], url='https://sv.bagoum.com/cards/{}'.format(result['id']))
             race = result['faction'] if not result['race'] else '{}/{}'.format(result['faction'], result['race'])
             embed.set_thumbnail(url='https://sv.bagoum.com/cardF/en/c/{}'.format(result['id']))
             embed.set_image(url='https://sv.bagoum.com/getRawImage/0/0/{}'.format(result['id']))
@@ -180,7 +180,7 @@ class Games(commands.Cog):
                 embed.add_field(name='Описание', value=result['baseData']['description'].replace('<br>', '\n'))
             embed.add_field(name='Flair', value=result['baseData']['flair'].replace('<br>', '\n'))
             if result['hasEvo']:
-                evoembed = discord.Embed(title=result['name']+' (evolved)',
+                evoembed = discord.Embed(color=discord.Color.dark_purple(), title=result['name']+' (evolved)',
                                          url='https://sv.bagoum.com/cards/{}'.format(result['id']))
                 evoembed.set_thumbnail(url='https://sv.bagoum.com/cardF/en/e/{}'.format(result['id']))
                 evoembed.set_image(url='https://sv.bagoum.com/getRawImage/1/0/{}'.format(result['id']))
@@ -220,7 +220,7 @@ class Games(commands.Cog):
                 content = ''
                 for i in range(len(results)):
                     content += '{}. {}\n'.format(i + 1, results[i]['name'])
-                embed = discord.Embed(title='Выберите карту', description=content)
+                embed = discord.Embed(color=discord.Color.dark_purple(), title='Выберите карту', description=content)
                 embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
                 choice = await ctx.send(embed=embed)
                 canc = False
@@ -239,10 +239,10 @@ class Games(commands.Cog):
                 if int(msg.content) == 0:
                     return await choice.delete()
                 result = results[int(msg.content) - 1]
-            embed = discord.Embed(title=result['name'], url='https://sv.bagoum.com/cards/{}'.format(result['id']))
+            embed = discord.Embed(color=discord.Color.dark_purple(), title=result['name'], url='https://sv.bagoum.com/cards/{}'.format(result['id']))
             embed.set_image(url='https://sv.bagoum.com/getRawImage/0/0/{}'.format(result['id']))
             if result['hasEvo']:
-                evoembed = discord.Embed(title=result['name']+' (evolved)',
+                evoembed = discord.Embed(color=discord.Color.dark_purple(), title=result['name']+' (evolved)',
                                          url='https://sv.bagoum.com/cards/{}'.format(result['id']))
                 evoembed.set_image(url='https://sv.bagoum.com/getRawImage/1/0/{}'.format(result['id']))
                 await ctx.send(embed=embed)

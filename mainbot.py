@@ -96,7 +96,7 @@ async def help_(ctx, request=None):
     try:
         pref = await get_prefix(bot, ctx.message)
         if request is None:
-            embed = discord.Embed(title='Команды')
+            embed = discord.Embed(color=discord.Color.dark_purple(), title='Команды')
             for command in bot.commands:
                 if not command.hidden:
                     if command.cog_name is not None:
@@ -115,9 +115,9 @@ async def help_(ctx, request=None):
         for command in bot.commands:
             if ((command.name == request.lower()) or (request.lower() in command.aliases)) and not command.hidden:
                 if command.aliases:
-                    embed = discord.Embed(title='[{}|{}]'.format(command.name, '|'.join(command.aliases)))
+                    embed = discord.Embed(color=discord.Color.dark_purple(), title='[{}|{}]'.format(command.name, '|'.join(command.aliases)))
                 else:
-                    embed = discord.Embed(title=command.name)
+                    embed = discord.Embed(color=discord.Color.dark_purple(), title=command.name)
                 embed.add_field(name='Описание', value=command.help)
                 embed.add_field(name='Использование', value=command.usage.format(pref))
                 return await ctx.send(embed=embed)

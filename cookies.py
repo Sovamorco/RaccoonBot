@@ -104,7 +104,7 @@ class Cookies(commands.Cog):
         cookies = json.load(open('resources/cookies.json', 'r'))
         cookies = sorted(cookies.items(), key=lambda kv: kv[1]['cookies'], reverse=True)
         length = 10 if len(cookies) > 10 else len(cookies)
-        embed = discord.Embed()
+        embed = discord.Embed(color=discord.Color.dark_purple())
         embedValue = ''
         for i in range(length):
             amt = cookies[i][1]['cookies']
@@ -149,7 +149,7 @@ class Cookies(commands.Cog):
         Дилер берет {}
         Дилер выдает вам {}
         Дилер берет в закрытую'''.format(fst[0], snd[0], trd[0])
-        embed = discord.Embed(title='Ход игры', description=embedValue)
+        embed = discord.Embed(color=discord.Color.dark_purple(), title='Ход игры', description=embedValue)
         msg = await ctx.send(embed=embed)
         if sum(split[0]) == 21:
             add(user.id, amt * 2)

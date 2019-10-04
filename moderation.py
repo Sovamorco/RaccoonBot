@@ -60,7 +60,7 @@ class Moderation(commands.Cog):
 
     @commands.command(name='ping', pass_context=True, help='Команда для проверки жизнеспособности бота', usage='{}ping')
     async def ping_(self, ctx):
-        embed = discord.Embed(description='Pong')
+        embed = discord.Embed(color=discord.Color.dark_purple(), description='Pong')
         ts = time()
         msg = await ctx.send(embed=embed)
         tm = (time() - ts) * 1000

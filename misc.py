@@ -35,7 +35,7 @@ class Misc(commands.Cog):
         with open('resources/raccoons.txt', 'r') as f:
             raccoons = load(f)
             raccoon = choice(raccoons)
-        embed = discord.Embed()
+        embed = discord.Embed(color=discord.Color.dark_purple())
         embed.set_image(url=raccoon)
         return await ctx.send(msg, embed=embed)
 
@@ -46,7 +46,7 @@ class Misc(commands.Cog):
         if msg is None:
             msg = user.mention
         image = requests.get('http://inspirobot.me/api?generate=true', proxies=proxies).text
-        embed = discord.Embed()
+        embed = discord.Embed(color=discord.Color.dark_purple())
         embed.set_image(url=image)
         return await ctx.send(msg, embed=embed)
 
@@ -59,7 +59,7 @@ class Misc(commands.Cog):
         with open('resources/facts.json', 'r') as f:
             facts = load(f)
             fact = choice(facts)
-        embed = discord.Embed(description=fact)
+        embed = discord.Embed(color=discord.Color.dark_purple(), description=fact)
         return await ctx.send(msg, embed=embed)
 
     @commands.command(name='wikia', aliases=['wiki'], help='Команда для поиска статей на Fandom',
@@ -93,7 +93,7 @@ class Misc(commands.Cog):
                         i += 1
                         embedValue += '{}. {}\n'.format(i, result['title'])
                         new_results.append(result)
-            embed = discord.Embed(title='Выберите фэндом', description=embedValue)
+            embed = discord.Embed(color=discord.Color.dark_purple(), title='Выберите фэндом', description=embedValue)
             embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
             choicemsg = await ctx.send(embed=embed)
             canc = False
@@ -169,7 +169,7 @@ class Misc(commands.Cog):
                     }
                 result = requests.get(apiurl + 'Articles/Details', params=params, timeout=0.5).json()
                 thumb = result['items'][str(page_id)]['thumbnail']
-            embed = discord.Embed(title=title, url=page_url, description=desc)
+            embed = discord.Embed(color=discord.Color.dark_purple(), title=title, url=page_url, description=desc)
             if thumb is not None:
                 embed.set_thumbnail(url=thumb)
             return await ctx.send(user.mention, embed=embed)
@@ -222,7 +222,7 @@ class Misc(commands.Cog):
                                 i += 1
                                 embedValue += '{}. {}\n'.format(i, result['title'])
                                 new_results.append(result)
-            embed = discord.Embed(title='Выберите фэндом', description=embedValue)
+            embed = discord.Embed(color=discord.Color.dark_purple(), title='Выберите фэндом', description=embedValue)
             embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
             choicemsg = await ctx.send(embed=embed)
             canc = False
@@ -247,7 +247,7 @@ class Misc(commands.Cog):
                 apiurl = '{}api/v1/'.format(result['url'])
             else:
                 apiurl = '{}/api/v1/'.format(result['url'])
-            embed = discord.Embed(title='Введите запрос', description='Отправьте запрос для поска по {}'.format(result['title']))
+            embed = discord.Embed(color=discord.Color.dark_purple(), title='Введите запрос', description='Отправьте запрос для поска по {}'.format(result['title']))
             embed.set_footer(text='Автоматическая отмена через 60 секунд\nОтправьте 0 для отмены')
             choicemsg = await ctx.send(embed=embed)
             canc = False
@@ -272,11 +272,11 @@ class Misc(commands.Cog):
             try:
                 result = requests.get(apiurl + 'Search/List', params=params, timeout=0.5).json()
             except Exception as e:
-                embed = discord.Embed(title='Ошибка', description='Ничего не найдено')
+                embed = discord.Embed(color=discord.Color.dark_purple(), title='Ошибка', description='Ничего не найдено')
                 await choicemsg.edit(embed=embed)
                 return print(e)
             if 'exception' in result.keys() or result['batches'] == 0:
-                embed = discord.Embed(title='Ошибка', description='Ничего не найдено')
+                embed = discord.Embed(color=discord.Color.dark_purple(), title='Ошибка', description='Ничего не найдено')
                 return await choicemsg.edit(embed=embed)
             page_id = result['items'][0]['id']
             params = {
@@ -315,7 +315,7 @@ class Misc(commands.Cog):
                     }
                 result = requests.get(apiurl + 'Articles/Details', params=params, timeout=0.5).json()
                 thumb = result['items'][str(page_id)]['thumbnail']
-            embed = discord.Embed(title=title, url=page_url, description=desc)
+            embed = discord.Embed(color=discord.Color.dark_purple(), title=title, url=page_url, description=desc)
             if thumb is not None:
                 embed.set_thumbnail(url=thumb)
             return await choicemsg.edit(content=user.mention, embed=embed)
@@ -351,7 +351,7 @@ class Misc(commands.Cog):
                                                          result['result']['title'])
                     new_results.append(result)
 
-            embed = discord.Embed(title='Выберите трек', description=embedValue)
+            embed = discord.Embed(color=discord.Color.dark_purple(), title='Выберите трек', description=embedValue)
             embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
             choicemsg = await ctx.send(embed=embed)
             canc = False
@@ -383,17 +383,17 @@ class Misc(commands.Cog):
                 for i in range(len(lyrlist)):
                     lyrics += lyrlist[i] + '\n'
                     if i < len(lyrlist) - 1 and len(lyrics + lyrlist[i + 1]) > 2000:
-                        embed = discord.Embed(color=discord.Color.blurple(),
+                        embed = discord.Embed(color=discord.Color.dark_purple(),
                                               title='Текст {} ({})'.format(title, it), description=lyrics)
                         await ctx.send(embed=embed)
                         lyrics = ''
                         it += 1
                     elif i == len(lyrlist) - 1:
-                        embed = discord.Embed(color=discord.Color.blurple(),
+                        embed = discord.Embed(color=discord.Color.dark_purple(),
                                               title='Текст {} ({})'.format(title, it), description=lyrics)
                         return await ctx.send(embed=embed)
             else:
-                embed = discord.Embed(color=discord.Color.blurple(),
+                embed = discord.Embed(color=discord.Color.dark_purple(),
                                       title='Текст ' + title, description=lyrics)
                 return await ctx.send(embed=embed)
 
@@ -407,7 +407,7 @@ class Misc(commands.Cog):
         for ch in channels:
             if (ch.__class__ == discord.channel.VoiceChannel) and (ch.name.lower() == channel.lower()):
                 link = 'https://discordapp.com/channels/{}/{}'.format(ctx.guild.id, ch.id)
-                embed = discord.Embed(description='[Магическая ссылка для канала {}]({})'.format(ch.name, link))
+                embed = discord.Embed(color=discord.Color.dark_purple(), description='[Магическая ссылка для канала {}]({})'.format(ch.name, link))
                 return await ctx.send(embed=embed)
         return await ctx.send('Канал с таким именем не найден')
 
