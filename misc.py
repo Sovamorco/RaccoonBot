@@ -4,23 +4,51 @@ import requests
 from json import load
 from random import choice
 from html import unescape
-from credentials import genius_token
+from credentials import genius_token, shiki_client_id, shiki_client_secret
 from bs4 import BeautifulSoup
 import re
 from utils import get_prefix
 import os
 import time
 import git
+import json
+import asyncio
+import datetime
+import locale
 
 proxies = {
     'http': 'socks4://91.83.227.147:57276',
     # 'https': 'socks4://91.83.227.147:57276'
 }
+locale.setlocale(locale.LC_ALL, 'ru_RU')
+
+
+def shiki_refresh(rt):
+    payload = {
+        'grant_type': 'refresh_token',
+        'client_id': shiki_client_id,
+        'client_secret': shiki_client_secret,
+        'refresh_token': rt
+    }
+    headers = {
+        'User-Agent': 'RaccoonBot'
+    }
+    req = requests.post('https://shikimori.one/oauth/token', data=payload, headers=headers).json()
+    json.dump(req, open('resources/shiki.json', 'w+'))
+
+
+async def refresh_shiki_token():
+    while True:
+        auth = json.load(open('resources/shiki.json', 'r+'))
+        if time.time() - 3800 > auth['created_at'] + auth['expires_in']:
+            shiki_refresh(auth['refresh_token'])
+        await asyncio.sleep(3600)
 
 
 class Misc(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.bot.loop.create_task(refresh_shiki_token())
 
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.CommandInvokeError) and str(error.original):
@@ -410,6 +438,90 @@ class Misc(commands.Cog):
                 embed = discord.Embed(color=discord.Color.dark_purple(), description='[Магическая ссылка для канала {}]({})'.format(ch.name, link))
                 return await ctx.send(embed=embed)
         return await ctx.send('Канал с таким именем не найден')
+
+    @commands.command(name='shikimori', aliases=['shiki'], usage='{}shikimori <запрос>', help='Команда для поиска аниме на шикимори')
+    async def shiki_(self, ctx, *, query=''):
+        pref = await get_prefix(self.bot, ctx.message)
+        if not query:
+            return await ctx.send(f'Использование {pref}[shikimori|shiki] <запрос>')
+        auth = json.load(open('resources/shiki.json', 'r'))
+        at = '{token_type} {access_token}'.format(**auth)
+        headers = {
+            'User-Agent': 'RaccoonBot',
+            'Authorization': at
+        }
+        params = {
+            'limit': 10,
+            'search': query,
+            'order': 'popularity'
+        }
+        results = requests.get('https://shikimori.one/api/animes', headers=headers, params=params).json()
+        embed = discord.Embed(color=discord.Color.dark_purple())
+        if not results:
+            embed.description = 'Ничего не найдено'
+            return await ctx.send(embed=embed)
+        if len(results) > 1:
+            embed.title = 'Выберите аниме'
+            embed.description = '\n'.join(f'{i+1}. {results[i]["russian"]} [{results[i]["kind"].capitalize()+" (Анонс)"*(results[i]["status"] == "anons")}]' for i in range(len(results)))
+            embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
+            choicemsg = await ctx.send(embed=embed)
+            canc = False
+
+            def verify(m):
+                nonlocal canc
+                if m.content.isdigit():
+                    return (0 <= int(m.content) <= len(results)) and (m.channel == ctx.channel) and (m.author == ctx.author)
+                canc = (m.channel == ctx.channel) and (m.author == ctx.author) and (m.content.startswith(pref)) and len(m.content) > len(pref)
+                return canc
+
+            msg = await self.bot.wait_for('message', check=verify, timeout=30)
+            if canc or int(msg.content) == 0:
+                return await choicemsg.delete()
+            result = results[int(msg.content) - 1]
+            await choicemsg.delete()
+        else:
+            result = results[0]
+        title = result['russian'] if result['russian'] else result['name']
+        embed = discord.Embed(color=discord.Color.dark_purple(), title=title, url='https://shikimori.one'+result['url'])
+        info = requests.get(f'https://shikimori.one/api/animes/{result["id"]}', headers=headers).json()
+        embed.set_thumbnail(url='https://shikimori.one'+info['image']['original'])
+        if info['status'] != 'anons':
+            episodes = '{episodes_aired}/{episodes}'.format(**info) if info['ongoing'] else info['episodes']
+            embed.add_field(name='Эпизоды', value=episodes)
+        kind = info['kind'].capitalize()+' (анонс)' if info['status'] == 'anons' else info['kind'].capitalize()
+        embed.add_field(name='Формат', value=kind)
+        if any(studio['real'] for studio in info['studios']):
+            studios = []
+            for studio in info['studios']:
+                if studio['real']:
+                    studios += [studio['filtered_name']]
+            embed.add_field(name='Студии', value=', '.join(studios))
+        if info['japanese']:
+            embed.add_field(name='Оригинальное название', value=info['japanese'][0])
+        if info['genres']:
+            embed.add_field(name='Жанры', value=', '.join(gen['russian'] for gen in info['genres']))
+        if info['score'] and info['status'] != 'anons':
+            embed.add_field(name='Оценка', value=info['score'])
+        if info['status'] == 'anons':
+            if info['aired_on']:
+                date = datetime.datetime.strptime(info['aired_on'][:-6], '%Y-%m-%dT%H:%M:%S.%f').strftime('%a, %d %b %Y %H:%M')
+                embed.add_field(name='Дата начала показа', value=date)
+        else:
+            if info['released_on'] or info['aired_on']:
+                date = info['aired_on'] if info['ongoing'] else info['released_on']
+                date = datetime.datetime.strptime(date, '%Y-%m-%d').strftime('%d %b %Y')
+                name = 'Дата начала показа' if info['ongoing'] else 'Дата окончания показа'
+                embed.add_field(name=name, value=date)
+            if info['next_episode_at']:
+                date = datetime.datetime.strptime(info['next_episode_at'][:-6], '%Y-%m-%dT%H:%M:%S.%f').strftime('%a, %d %b %Y %H:%M')
+                embed.add_field(name='Дата выхода следующего эпизода', value=date)
+        if info['description']:
+            desc = info['description']
+            desc = re.sub(r'\[([^)]+?)]', '', desc)
+            if len(desc) > 300:
+                desc = desc[:300] + '...'
+            embed.add_field(name='Описание', value=desc)
+        return await ctx.send(embed=embed)
 
     @commands.command(name='changelog', usage='{}changelog', help='Команда, показывающая последние обновления бота')
     async def changelog_(self, ctx):

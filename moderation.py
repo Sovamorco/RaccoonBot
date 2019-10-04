@@ -4,7 +4,8 @@ from utils import form, get_prefix
 import json
 import os
 from time import time
-from credentials import discord_pers_id
+from credentials import discord_pers_id, shiki_auth_link, shiki_client_id, shiki_client_secret
+import requests
 
 
 class Moderation(commands.Cog):
@@ -86,6 +87,34 @@ class Moderation(commands.Cog):
             await self.bot.change_presence(activity=activity)
             os.system('bash /home/mrdandycorn/update.sh')
             os.system('pm2 reload RaccoonBot')
+
+    @commands.command(name='shiki_auth', usage='{}shiki_auth', help='Команда для повторной авторизации на шикимори', hidden=True)
+    async def shiki_auth_(self, ctx):
+        if ctx.author.id == discord_pers_id:
+            embed = discord.Embed(color=discord.Color.dark_purple(), title='Ссылка для авторизации', url=shiki_auth_link)
+            embed.set_footer(text='Отправьте 0 для отмены')
+            req = await ctx.send(embed=embed)
+
+            def verify(m):
+                return m.author.id == discord_pers_id
+
+            msg = await self.bot.wait_for('message', check=verify, timeout=60)
+            await req.delete()
+            if msg.content.isdigit() and int(msg.content) == 0:
+                return
+            code = msg.content
+            payload = {
+                'client_id': shiki_client_id,
+                'client_secret': shiki_client_secret,
+                'code': code,
+                'grant_type': 'authorization_code',
+                'redirect_uri': 'urn:ietf:wg:oauth:2.0:oob'
+            }
+            headers = {
+                'User-Agent': 'RaccoonBot'
+            }
+            req = requests.post('https://shikimori.one/oauth/token', data=payload, headers=headers).json()
+            return json.dump(req, open('resources/shiki.json', 'w+'))
 
 
 def mod_setup(bot):
