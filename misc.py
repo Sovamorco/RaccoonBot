@@ -388,7 +388,7 @@ class Misc(commands.Cog):
                 nonlocal canc
                 if m.content.isdigit():
                     return (0 <= int(m.content) <= len(new_results)) and (m.channel == text_channel) and (
-                                m.author == user)
+                            m.author == user)
                 canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(
                     m.content) > 1
                 return canc
@@ -462,7 +462,8 @@ class Misc(commands.Cog):
             return await ctx.send(embed=embed)
         if len(results) > 1:
             embed.title = 'Выберите аниме'
-            embed.description = '\n'.join(f'{i+1}. {results[i]["russian"]} [{results[i]["kind"].capitalize()+" (Анонс)"*(results[i]["status"] == "anons")}]' for i in range(len(results)))
+            embed.description = '\n'.join(
+                f'{i + 1}. {results[i]["russian"]} [{results[i]["kind"].capitalize() + " (Анонс)" * (results[i]["status"] == "anons")}]' for i in range(len(results)))
             embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
             choicemsg = await ctx.send(embed=embed)
             canc = False
@@ -482,13 +483,13 @@ class Misc(commands.Cog):
         else:
             result = results[0]
         title = result['russian'] if result['russian'] else result['name']
-        embed = discord.Embed(color=discord.Color.dark_purple(), title=title, url='https://shikimori.one'+result['url'])
+        embed = discord.Embed(color=discord.Color.dark_purple(), title=title, url='https://shikimori.one' + result['url'])
         info = requests.get(f'https://shikimori.one/api/animes/{result["id"]}', headers=headers).json()
-        embed.set_thumbnail(url='https://shikimori.one'+info['image']['original'])
+        embed.set_thumbnail(url='https://shikimori.one' + info['image']['original'])
         if not info['anons']:
             episodes = '{episodes_aired}/{episodes}'.format(**info) if info['ongoing'] else info['episodes']
             embed.add_field(name='Эпизоды', value=episodes)
-        kind = info['kind'].capitalize()+' (анонс)' if info['anons'] else info['kind'].capitalize()
+        kind = info['kind'].capitalize() + ' (анонс)' if info['anons'] else info['kind'].capitalize()
         embed.add_field(name='Формат', value=kind)
         if any(studio['real'] for studio in info['studios']):
             studios = []
@@ -522,7 +523,7 @@ class Misc(commands.Cog):
             embed.add_field(name='Описание', value=desc)
         return await ctx.send(embed=embed)
 
-    @commands.command(name='changelog', usage='{}changelog', help='Команда, показывающая последние обновления бота')
+    @commands.command(name='changelog', usage='{}changelog', help='Команда, показывающая последние обновления бота')  # TODO: Сделать удобные версии бота
     async def changelog_(self, ctx):
         repo = git.Repo(os.getcwd())
         commits = list(repo.iter_commits('master'))
@@ -534,7 +535,7 @@ class Misc(commands.Cog):
                 unique.append(commit.message)
                 cnt += 1
                 embed.description += f'\n{time.strftime("%d-%m-%Y", time.gmtime(commit.authored_date - commit.author_tz_offset))}: {commit.message.strip()}'
-            if cnt == 10:
+            if cnt == 20:
                 return await ctx.send(embed=embed)
 
 

@@ -4,7 +4,7 @@ from misc import *
 from games import *
 from cookies import *
 from moderation import *
-from credentials import discord_status, discord_alpha_token, dev
+from credentials import discord_status, discord_bot_token, discord_alpha_token, dev
 from utils import get_prefix
 
 default_prefix = '?'
@@ -44,22 +44,22 @@ async def on_ready():
     except discord.errors.ClientException:
         pass
     if not dev:
-        check()
+        await check(bot)
     print('Logged on as', bot.user)
 
 
 @bot.event
 async def on_raw_reaction_add(payload):
-    if payload.message_id == int(discord_message_id) and payload.channel_id == int(discord_channel_id):
+    if payload.message_id == discord_message_id and payload.channel_id == discord_channel_id:
         print('Added ' + str(payload.emoji.name))
-        guild = discord.utils.get(bot.guilds, id=payload.guild_id)
+        guild = bot.get_guild(payload.guild_id)
         member = guild.get_member(payload.user_id)
         if payload.emoji.name in emojitorole.keys():
-            role = discord.utils.get(guild.roles, name=emojitorole[payload.emoji.name])
+            role = guild.get_role(emojitorole[payload.emoji.name])
             print(str(guild) + ' / ' + str(member) + ' / ' + str(role))
             await member.add_roles(role)
         else:
-            channel = discord.utils.get(guild.channels, id=payload.channel_id)
+            channel = guild.get_channel(payload.channel_id)
             message = await channel.fetch_message(payload.message_id)
             print(str(guild) + ' / ' + str(member) + ' / ' + str(payload.emoji.name))
             await message.remove_reaction(payload.emoji, member)
@@ -67,12 +67,12 @@ async def on_raw_reaction_add(payload):
 
 @bot.event
 async def on_raw_reaction_remove(payload):
-    if payload.message_id == int(discord_message_id) and payload.channel_id == int(discord_channel_id):
+    if payload.message_id == discord_message_id and payload.channel_id == discord_channel_id:
         print('Removed ' + str(payload.emoji.name))
-        guild = discord.utils.get(bot.guilds, id=payload.guild_id)
+        guild = bot.get_guild(payload.guild_id)
         member = guild.get_member(payload.user_id)
         if payload.emoji.name in emojitorole.keys():
-            role = discord.utils.get(guild.roles, name=emojitorole[payload.emoji.name])
+            role = guild.get_role(emojitorole[payload.emoji.name])
             print(str(guild) + ' / ' + str(member) + ' / ' + str(role))
             await member.remove_roles(role)
         else:
@@ -83,9 +83,8 @@ async def on_raw_reaction_remove(payload):
 async def update(ctx):
     try:
         if ctx.author.id == discord_pers_id:
-            async with ctx.channel.typing():
-                check()
-                await ctx.send('Обновил роли!')
+            await check(bot)
+            await ctx.message.add_reaction('👌')
     except Exception as e:
         await ctx.send('Ошибка: \n {}'.format(e))
 
