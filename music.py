@@ -11,7 +11,7 @@ import discord
 import lavalink
 from discord.ext import commands
 from bs4 import BeautifulSoup
-from utils import form, get_prefix
+from utils import form, get_prefix, get_color
 from credentials import main_password, discord_pers_id, main_web_addr, gachi_things, genius_token, dev, discord_guild_id,\
     discord_inter_guild_id, discord_inter_afk_channel_id, discord_dev_guild_id, discord_dev_afk_channel_id, discord_afk_music
 
@@ -112,7 +112,7 @@ class Music(commands.Cog):
         results = await player.node.get_tracks(query)
         if not results or not results['tracks']:
             return await ctx.send('Ничего не найдено')
-        embed = discord.Embed(color=discord.Color.dark_purple())
+        embed = discord.Embed(color=get_color(results['tracks'][0]['info']['uri']))
         if results['loadType'] == 'PLAYLIST_LOADED':
             tracks = results['tracks']
             for track in tracks:
@@ -132,7 +132,7 @@ class Music(commands.Cog):
                     title = tracks[i]['info']['title']
                     embedValue += '{}: {}\n'.format(i + 1, title)
                 choiceEmbed = discord.Embed(title="Выберите трек", description=embedValue,
-                                            color=discord.Color.dark_purple())
+                                            color=discord.Color.red())
                 choiceEmbed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
                 choice = await ctx.send(embed=choiceEmbed, delete_after=30)
                 canc = False
@@ -169,7 +169,7 @@ class Music(commands.Cog):
         results = await player.node.get_tracks(query)
         if not results or not results['tracks']:
             return await ctx.send('Ничего не найдено')
-        embed = discord.Embed(color=discord.Color.dark_purple())
+        embed = discord.Embed(color=get_color(results['tracks'][0]['info']['uri']))
         if results['loadType'] == 'PLAYLIST_LOADED':
             tracks = results['tracks']
             for track in reversed(tracks):
@@ -189,7 +189,7 @@ class Music(commands.Cog):
                     title = tracks[i]['info']['title']
                     embedValue += '{}: {}\n'.format(i + 1, title)
                 choiceEmbed = discord.Embed(title="Выберите трек", description=embedValue,
-                                            color=discord.Color.dark_purple())
+                                            color=discord.Color.red())
                 choiceEmbed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
                 choice = await ctx.send(embed=choiceEmbed, delete_after=30)
                 canc = False
@@ -280,9 +280,8 @@ class Music(commands.Cog):
         if player.queue or player.current:
             while not player.is_playing:
                 pass
-            cur = player.current
-            track = 'Дальше: {}'.format(cur.title if not cur.title == 'Unknown title' else cur.identifier)
-            await ctx.send(track)
+            embed = discord.Embed(color=get_color(player.current.uri), title='⏩Дальше', description=f'[{player.current.title}]({player.current.uri})')
+            await ctx.send(embed=embed)
         await ctx.message.add_reaction('👌')
 
     @commands.command(help='Команда для остановки плеера и очистки очереди', usage='{}stop')
@@ -303,7 +302,7 @@ class Music(commands.Cog):
         player.queue.clear()
         await ctx.message.add_reaction('👌')
 
-    @commands.command(aliases=['n', 'np', 'playing', 'current'], usage='{}[np|now|playing|current]',
+    @commands.command(aliases=['n', 'np', 'playing', 'current'], usage='{}[n|np|now|playing|current]',
                       help='Команда для отображения текущего трека')
     async def now(self, ctx):
         player = self.bot.lavalink.players.get(ctx.guild.id)
@@ -314,9 +313,8 @@ class Music(commands.Cog):
             duration = '🔴 LIVE'
         else:
             duration = lavalink.utils.format_time(player.current.duration)
-        song = f'**[{player.current.title}]({player.current.uri})**\n({position}/{duration})'
-
-        embed = discord.Embed(color=discord.Color.dark_purple(),
+        song = f'[{player.current.title}]({player.current.uri})\n({position}/{duration})'
+        embed = discord.Embed(color=get_color(player.current.uri),
                               title='Сейчас играет', description=song)
         await ctx.send(embed=embed)
 
