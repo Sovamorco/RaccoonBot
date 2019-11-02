@@ -523,7 +523,7 @@ class Misc(commands.Cog):
             embed.add_field(name='Описание', value=desc)
         return await ctx.send(embed=embed)
 
-    @commands.command(name='changelog', usage='{}changelog', help='Команда, показывающая последние обновления бота')  # TODO: Сделать удобные версии бота
+    @commands.command(name='changelog', usage='{}changelog', help='Команда, показывающая последние обновления бота')
     async def changelog_(self, ctx):
         repo = git.Repo(os.getcwd())
         commits = list(repo.iter_commits('master'))

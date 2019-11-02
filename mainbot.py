@@ -6,6 +6,7 @@ from cookies import *
 from moderation import *
 from credentials import discord_status, discord_bot_token, discord_alpha_token, dev
 from utils import get_prefix
+import signal
 
 default_prefix = '?'
 
@@ -30,6 +31,24 @@ async def change_status():
         activity = discord.Streaming(name=status, url='https://twitch.tv/mrdandycorn')
         await bot.change_presence(activity=activity)
         await asyncio.sleep(300)
+
+
+async def updating_status():
+    activity = discord.Streaming(name='Updating...', url='https://twitch.tv/mrdandycorn')
+    await bot.change_presence(activity=activity)
+
+
+def atexit_func():
+    print("You are now leaving the Python sector.")
+    bot.loop.run_until_complete(updating_status())
+
+
+for i in [x for x in dir(signal) if x.startswith("SIG")]:
+    try:
+        signum = getattr(signal, i)
+        signal.signal(signum, atexit_func)
+    except Exception as e:
+        print(f'Error occured while setting signals: \n{e}')
 
 
 @bot.event
