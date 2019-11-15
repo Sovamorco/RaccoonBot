@@ -39,7 +39,7 @@ async def on_ready():
         misc_setup(bot)
         music_setup(bot)
         cookies_setup(bot)
-        games_setup(bot)
+        await games_setup(bot)
         mod_setup(bot)
     except discord.errors.ClientException:
         pass

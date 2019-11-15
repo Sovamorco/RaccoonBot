@@ -45,11 +45,17 @@ class osumods(IntFlag):
 class Games(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        try:
-            self.cards = httpx.get('https://sv.bagoum.com/cardsFullJSON').json()
-        except Exception as e:
-            print(e)
-            self.cards = httpx.get('https://sv.bagoum.com/cardsFullJSON').json()
+        self.cards = {}
+
+    async def init(self):
+        async with httpx.AsyncClient() as client:
+            try:
+                cards = await client.get('https://sv.bagoum.com/cardsFullJSON')
+                self.cards = cards.json()
+            except Exception as e:
+                print(e)
+                cards = await client.get('https://sv.bagoum.com/cardsFullJSON')
+                self.cards = cards.json()
 
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.CommandInvokeError) and str(error.original):
@@ -268,5 +274,7 @@ class Games(commands.Cog):
             return await ctx.send('При обновлении базы данных карт произошла ошибка. Подробнее:\n{}'.format(e))
 
 
-def games_setup(bot):
-    bot.add_cog(Games(bot))
+async def games_setup(bot):
+    games = Games(bot)
+    await games.init()
+    bot.add_cog(games)
