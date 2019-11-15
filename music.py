@@ -2,7 +2,7 @@ import math
 import re
 import random
 import json
-import requests
+import httpx
 import asyncio
 
 from tts import *
@@ -13,12 +13,12 @@ from discord.ext import commands
 from bs4 import BeautifulSoup
 from utils import form, get_prefix, get_color
 from credentials import main_password, discord_pers_id, main_web_addr, gachi_things, genius_token, dev, discord_guild_id,\
-    discord_inter_guild_id, discord_inter_afk_channel_id, discord_dev_guild_id, discord_dev_afk_channel_id, discord_afk_music
+    discord_inter_guild_id, discord_inter_afk_channel_id, discord_dev_guild_id, discord_dev_afk_channel_id
 
 url_rx = re.compile('https?://(?:www\\.)?.+')
 
 
-# noinspection PyProtectedMember
+# noinspection PyProtectedMember,PyTypeChecker
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -332,7 +332,8 @@ class Music(commands.Cog):
         headers = {
             'Authorization': 'Bearer ' + genius_token
         }
-        req = requests.get('https://api.genius.com/search', params=params, headers=headers)
+        async with httpx.AsyncClient() as client:
+            req = await client.get('https://api.genius.com/search', params=params, headers=headers)
         result = req.json()['response']['hits']
         if len(result) == 0:
             return await ctx.send('Песня не найдена')
@@ -342,7 +343,8 @@ class Music(commands.Cog):
                 if result['result']['lyrics_state'] == 'complete':
                     url = result['result']['url']
                     title = '{} - {}'.format(result['result']['primary_artist']['name'], result['result']['title'])
-                    lyrics = requests.get(url)
+                    async with httpx.AsyncClient() as client:
+                        lyrics = await client.get(url)
                     soup = BeautifulSoup(lyrics.text, 'html.parser')
                     lyrics = soup.p.get_text()
                     if len(lyrics) > 4000:
