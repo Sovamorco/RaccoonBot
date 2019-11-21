@@ -13,9 +13,11 @@ from discord.ext import commands
 from bs4 import BeautifulSoup
 from utils import form, get_prefix, get_color
 from credentials import main_password, discord_pers_id, main_web_addr, gachi_things, genius_token, dev, discord_guild_id,\
-    discord_inter_guild_id, discord_inter_afk_channel_id, discord_dev_guild_id, discord_dev_afk_channel_id
+    discord_inter_guild_id, discord_inter_afk_channel_id, discord_dev_guild_id, discord_dev_afk_channel_id, vkMusicKey
 
-url_rx = re.compile('https?://(?:www\\.)?.+')
+vk_rx = re.compile(r'https?://(?:www\.)?vk.com/(audios-?[0-9]+\?(?:section=playlists&)?z=audio_playlist-?[0-9]+_[0-9]+|music/album/-?[0-9]+_[0-9]+)')
+url_rx = re.compile(r'https?://(?:www\.)?.+')
+agent = 'KateMobileAndroid/52.1 lite-445 (Android 4.4.2; SDK 19; x86; unknown Android SDK built for x86; en)'
 
 
 # noinspection PyProtectedMember,PyTypeChecker
@@ -94,6 +96,41 @@ class Music(commands.Cog):
         ws = self.bot._connection._get_websocket(guild_id)
         await ws.voice_state(str(guild_id), channel_id)
 
+    async def vkAdd(self, url, ctx, force=False):
+        player = self.bot.lavalink.players.get(ctx.guild.id)
+        album = re.search(r'-?[0-9]+_[0-9]+', url)
+        if album:
+            album = album.group()
+        else:
+            return discord.Embed(color=discord.Color.blue(), title='❌Плейлист не найден')
+        user, aid = album.split('_')
+        headers = {
+            'User-Agent': agent
+        }
+        params = {
+            'access_token': vkMusicKey,
+            'v': '5.103',
+            'owner_id': user,
+            'playlist_id': aid
+        }
+        async with httpx.AsyncClient() as client:
+            res = await client.get('https://api.vk.com/method/audio.get', headers=headers, params=params)
+            playlist = await client.get('https://api.vk.com/method/audio.getPlaylistById', headers=headers, params=params)
+            res = res.json()['response']
+            playlist = playlist.json()['response']
+        items = reversed(res['items']) if force else res['items']
+        added = 0
+        for item in items:
+            if item['url']:
+                results = await player.node.get_tracks(item['url'])
+                track = results['tracks'][0]
+                track['info']['author'] = item['artist']
+                track['info']['title'] = item['title']
+                track['info']['uri'] = f'https://vk.com/music/album/{album}'
+                player.add(requester=ctx.author.id, track=track, index=0) if force else player.add(requester=ctx.author.id, track=track)
+                added += 1
+        return discord.Embed(color=discord.Color.blue(), title='✅Плейлист добавлен', description=f'{playlist["title"]} - {added} {form(added, ["трек", "трека", "треков"])}')
+
     @commands.command(aliases=['p'], usage='{}[p|play] <ссылка/название>', help='Команда для проигрывания музыки')
     async def play(self, ctx, *, query: str = ''):
         player = self.bot.lavalink.players.get(ctx.guild.id)
@@ -107,52 +144,55 @@ class Music(commands.Cog):
             else:
                 return await ctx.send(f'Использование: {pref}[p|play] <ссылка/название>')
         query = query.strip('<>')
-        if not url_rx.match(query):
-            query = f'ytsearch:{query}'
-        results = await player.node.get_tracks(query)
-        if not results or not results['tracks']:
-            return await ctx.send('Ничего не найдено')
-        embed = discord.Embed(color=get_color(results['tracks'][0]['info']['uri']))
-        if results['loadType'] == 'PLAYLIST_LOADED':
-            tracks = results['tracks']
-            for track in tracks:
-                player.add(requester=ctx.author.id, track=track)
-            embed.title = '✅Плейлист добавлен'
-            embed.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} {form(len(tracks), ["трек", "трека", "треков"])}'
+        if vk_rx.match(query):
+            embed = await self.vkAdd(query, ctx)
         else:
-            if url_rx.match(query):
-                track = results['tracks'][0]
-            else:
-                text_channel = ctx.message.channel
-                user = ctx.message.author
+            if not url_rx.match(query):
+                query = f'ytsearch:{query}'
+            results = await player.node.get_tracks(query)
+            if not results or not results['tracks']:
+                return await ctx.send('Ничего не найдено')
+            embed = discord.Embed(color=get_color(results['tracks'][0]['info']['uri']))
+            if results['loadType'] == 'PLAYLIST_LOADED':
                 tracks = results['tracks']
-                embedValue = ''
-                length = 10 if len(tracks) > 10 else len(tracks)
-                for i in range(length):
-                    title = tracks[i]['info']['title']
-                    embedValue += '{}: {}\n'.format(i + 1, title)
-                choiceEmbed = discord.Embed(title="Выберите трек", description=embedValue,
-                                            color=discord.Color.red())
-                choiceEmbed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
-                choice = await ctx.send(embed=choiceEmbed, delete_after=30)
-                canc = False
+                for track in tracks:
+                    player.add(requester=ctx.author.id, track=track)
+                embed.title = '✅Плейлист добавлен'
+                embed.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} {form(len(tracks), ["трек", "трека", "треков"])}'
+            else:
+                if url_rx.match(query):
+                    track = results['tracks'][0]
+                else:
+                    text_channel = ctx.message.channel
+                    user = ctx.message.author
+                    tracks = results['tracks']
+                    embedValue = ''
+                    length = 10 if len(tracks) > 10 else len(tracks)
+                    for i in range(length):
+                        title = tracks[i]['info']['title']
+                        embedValue += '{}: {}\n'.format(i + 1, title)
+                    choiceEmbed = discord.Embed(title="Выберите трек", description=embedValue,
+                                                color=discord.Color.red())
+                    choiceEmbed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
+                    choice = await ctx.send(embed=choiceEmbed, delete_after=30)
+                    canc = False
 
-                def verify(m):
-                    nonlocal canc
-                    if m.content.isdigit():
-                        return (0 <= int(m.content) < 11) and (m.channel == text_channel) and (m.author == user)
-                    canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(
-                        m.content) > 1
-                    return canc
+                    def verify(m):
+                        nonlocal canc
+                        if m.content.isdigit():
+                            return (0 <= int(m.content) < 11) and (m.channel == text_channel) and (m.author == user)
+                        canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(
+                            m.content) > 1
+                        return canc
 
-                msg = await self.bot.wait_for('message', check=verify, timeout=30)
-                if canc or int(msg.content) == 0:
-                    return await choice.delete()
-                track = tracks[int(msg.content) - 1]
-                await choice.delete()
-            embed.title = '✅Трек добавлен'
-            embed.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
-            player.add(requester=ctx.author.id, track=track)
+                    msg = await self.bot.wait_for('message', check=verify, timeout=30)
+                    if canc or int(msg.content) == 0:
+                        return await choice.delete()
+                    track = tracks[int(msg.content) - 1]
+                    await choice.delete()
+                embed.title = '✅Трек добавлен'
+                embed.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
+                player.add(requester=ctx.author.id, track=track)
         await ctx.send(embed=embed)
         if not player.is_playing:
             await player.play()
@@ -164,52 +204,55 @@ class Music(commands.Cog):
         if not query:
             return await ctx.send(f'Использование: {pref}[fp|force] <ссылка/название>')
         query = query.strip('<>')
-        if not url_rx.match(query):
-            query = f'ytsearch:{query}'
-        results = await player.node.get_tracks(query)
-        if not results or not results['tracks']:
-            return await ctx.send('Ничего не найдено')
-        embed = discord.Embed(color=get_color(results['tracks'][0]['info']['uri']))
-        if results['loadType'] == 'PLAYLIST_LOADED':
-            tracks = results['tracks']
-            for track in reversed(tracks):
-                player.add(requester=ctx.author.id, track=track, index=0)
-            embed.title = '✅Плейлист добавлен'
-            embed.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} {form(len(tracks), ["трек", "трека", "треков"])}'
+        if vk_rx.match(query):
+            embed = await self.vkAdd(query, ctx, force=True)
         else:
-            if url_rx.match(query):
-                track = results['tracks'][0]
-            else:
-                text_channel = ctx.message.channel
-                user = ctx.message.author
+            if not url_rx.match(query):
+                query = f'ytsearch:{query}'
+            results = await player.node.get_tracks(query)
+            if not results or not results['tracks']:
+                return await ctx.send('Ничего не найдено')
+            embed = discord.Embed(color=get_color(results['tracks'][0]['info']['uri']))
+            if results['loadType'] == 'PLAYLIST_LOADED':
                 tracks = results['tracks']
-                embedValue = ''
-                length = 10 if len(tracks) > 10 else len(tracks)
-                for i in range(length):
-                    title = tracks[i]['info']['title']
-                    embedValue += '{}: {}\n'.format(i + 1, title)
-                choiceEmbed = discord.Embed(title="Выберите трек", description=embedValue,
-                                            color=discord.Color.red())
-                choiceEmbed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
-                choice = await ctx.send(embed=choiceEmbed, delete_after=30)
-                canc = False
+                for track in reversed(tracks):
+                    player.add(requester=ctx.author.id, track=track, index=0)
+                embed.title = '✅Плейлист добавлен'
+                embed.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} {form(len(tracks), ["трек", "трека", "треков"])}'
+            else:
+                if url_rx.match(query):
+                    track = results['tracks'][0]
+                else:
+                    text_channel = ctx.message.channel
+                    user = ctx.message.author
+                    tracks = results['tracks']
+                    embedValue = ''
+                    length = 10 if len(tracks) > 10 else len(tracks)
+                    for i in range(length):
+                        title = tracks[i]['info']['title']
+                        embedValue += '{}: {}\n'.format(i + 1, title)
+                    choiceEmbed = discord.Embed(title="Выберите трек", description=embedValue,
+                                                color=discord.Color.red())
+                    choiceEmbed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
+                    choice = await ctx.send(embed=choiceEmbed, delete_after=30)
+                    canc = False
 
-                def verify(m):
-                    nonlocal canc
-                    if m.content.isdigit():
-                        return (0 <= int(m.content) < 11) and (m.channel == text_channel) and (m.author == user)
-                    canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(
-                        m.content) > 1
-                    return canc
+                    def verify(m):
+                        nonlocal canc
+                        if m.content.isdigit():
+                            return (0 <= int(m.content) < 11) and (m.channel == text_channel) and (m.author == user)
+                        canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(
+                            m.content) > 1
+                        return canc
 
-                msg = await self.bot.wait_for('message', check=verify, timeout=30)
-                if canc or int(msg.content) == 0:
-                    return await choice.delete()
-                track = tracks[int(msg.content) - 1]
-                await choice.delete()
-            embed.title = '✅Трек добавлен'
-            embed.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
-            player.add(requester=ctx.author.id, track=track, index=0)
+                    msg = await self.bot.wait_for('message', check=verify, timeout=30)
+                    if canc or int(msg.content) == 0:
+                        return await choice.delete()
+                    track = tracks[int(msg.content) - 1]
+                    await choice.delete()
+                embed.title = '✅Трек добавлен'
+                embed.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
+                player.add(requester=ctx.author.id, track=track, index=0)
         await ctx.send(embed=embed)
         if not player.is_playing:
             await player.play()
