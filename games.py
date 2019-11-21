@@ -82,15 +82,15 @@ class Games(commands.Cog):
             return await ctx.send('Слишком мало информации по пользователю')
         embed = discord.Embed(color=discord.Color.dark_purple(), title=result['username'], url='https://osu.ppy.sh/users/{}'.format(result['user_id']))
         embed.set_thumbnail(url='https://a.ppy.sh/{}'.format(result['user_id']))
-        embed.add_field(name='Rank', value='{:,}'.format(int(result['pp_rank'])))
+        embed.add_field(name='Rank', value='{:,}'.format(int(result['pp_rank'])), inline=False)
         embed.add_field(name='Country rank :flag_{}:'.format(result['country'].lower()),
-                        value='{:,}'.format(int(result['pp_country_rank'])))
-        embed.add_field(name='PP', value='{:,}'.format(round(float(result['pp_raw']))))
-        embed.add_field(name='Accuracy', value=str(round(float(result['accuracy']), 2)) + '%')
-        embed.add_field(name='Level', value=str(int(float(result['level']))))
-        embed.add_field(name='Play Count', value='{:,}'.format(int(result['playcount'])))
-        embed.add_field(name='Ranked Score', value='{:,}'.format(int(result['ranked_score'])))
-        embed.add_field(name='Total Score', value='{:,}'.format(int(result['total_score'])))
+                        value='{:,}'.format(int(result['pp_country_rank'])), inline=False)
+        embed.add_field(name='PP', value='{:,}'.format(round(float(result['pp_raw']))), inline=False)
+        embed.add_field(name='Accuracy', value=str(round(float(result['accuracy']), 2)) + '%', inline=False)
+        embed.add_field(name='Level', value=str(int(float(result['level']))), inline=False)
+        embed.add_field(name='Play Count', value='{:,}'.format(int(result['playcount'])), inline=False)
+        embed.add_field(name='Ranked Score', value='{:,}'.format(int(result['ranked_score'])), inline=False)
+        embed.add_field(name='Total Score', value='{:,}'.format(int(result['total_score'])), inline=False)
         await ctx.send(ctx.author.mention, embed=embed)
 
     @commands.command(name='osuplays', aliases=['ops'], usage='{}[ops|osuplays] <ник/id>',
@@ -134,7 +134,7 @@ class Games(commands.Cog):
             name = '{}. {} [{}] ({})'.format(i + 1, info['title'], info['version'], mods)
             value = 'Score: {:,}; Combo: {}; PP: {:,}; Acc: {}%; Rank: {}'.format(int(plays[i]['score']), combo, round(float(plays[i]['pp']), 2), accuracy,
                                                                                   plays[i]['rank'].replace('H', '', 1))
-            embed.add_field(name=name, value=value)
+            embed.add_field(name=name, value=value, inline=False)
         await msg.edit(content=ctx.author.mention, embed=embed)
 
     @commands.command(name='svcard', help='Команда для поиска карты из Shadowverse', usage='{}svcard <запрос>')
@@ -187,21 +187,21 @@ class Games(commands.Cog):
             race = result['faction'] if not result['race'] else '{}/{}'.format(result['faction'], result['race'])
             embed.set_thumbnail(url='https://sv.bagoum.com/cardF/en/c/{}'.format(result['id']))
             embed.set_image(url='https://sv.bagoum.com/getRawImage/0/0/{}'.format(result['id']))
-            embed.add_field(name='Класс', value=race)
-            embed.add_field(name='Дополнение', value=result['expansion'])
+            embed.add_field(name='Класс', value=race, inline=False)
+            embed.add_field(name='Дополнение', value=result['expansion'], inline=False)
             if result['baseData']['description']:
-                embed.add_field(name='Описание', value=result['baseData']['description'].replace('<br>', '\n'))
-            embed.add_field(name='Flair', value=result['baseData']['flair'].replace('<br>', '\n'))
+                embed.add_field(name='Описание', value=result['baseData']['description'].replace('<br>', '\n'), inline=False)
+            embed.add_field(name='Flair', value=result['baseData']['flair'].replace('<br>', '\n'), inline=False)
             if result['hasEvo']:
                 evoembed = discord.Embed(color=discord.Color.dark_purple(), title=result['name']+' (evolved)',
                                          url='https://sv.bagoum.com/cards/{}'.format(result['id']))
                 evoembed.set_thumbnail(url='https://sv.bagoum.com/cardF/en/e/{}'.format(result['id']))
                 evoembed.set_image(url='https://sv.bagoum.com/getRawImage/1/0/{}'.format(result['id']))
                 if result['evoData']['description']:
-                    evoembed.add_field(name='Описание', value=result['evoData']['description'].replace('<br>', '\n'))
+                    evoembed.add_field(name='Описание', value=result['evoData']['description'].replace('<br>', '\n'), inline=False)
                 elif result['baseData']['description']:
-                    evoembed.add_field(name='Описание', value=result['baseData']['description'].replace('<br>', '\n'))
-                evoembed.add_field(name='Flair', value=result['evoData']['flair'].replace('<br>', '\n'))
+                    evoembed.add_field(name='Описание', value=result['baseData']['description'].replace('<br>', '\n'), inline=False)
+                evoembed.add_field(name='Flair', value=result['evoData']['flair'].replace('<br>', '\n'), inline=False)
                 await ctx.send(embed=embed)
                 return await ctx.send(embed=evoembed)
             return await ctx.send(embed=embed)

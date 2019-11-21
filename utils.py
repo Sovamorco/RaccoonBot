@@ -31,4 +31,6 @@ def get_color(track):
         return Color.dark_blue()
     if 'mixer' in track or 'beam' in track:
         return Color.blurple()
+    if 'vkuseraudio' in track:
+        return Color.blue()
     return Color.greyple()

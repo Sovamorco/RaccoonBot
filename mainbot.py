@@ -108,7 +108,7 @@ async def help_(ctx, request=None):
                         commandlist[cog].append(command.name)
             for cog in sorted(commandlist.keys()):
                 commandlist[cog] = ', '.join(sorted(commandlist[cog]))
-                embed.add_field(name=cog, value=commandlist[cog])
+                embed.add_field(name=cog, value=commandlist[cog], inline=False)
             embed.set_footer(text=f'Более подробно: {pref}help <команда>')
             return await ctx.send(embed=embed)
         for command in bot.commands:
@@ -117,8 +117,8 @@ async def help_(ctx, request=None):
                     embed = discord.Embed(color=discord.Color.dark_purple(), title='[{}|{}]'.format(command.name, '|'.join(command.aliases)))
                 else:
                     embed = discord.Embed(color=discord.Color.dark_purple(), title=command.name)
-                embed.add_field(name='Описание', value=command.help)
-                embed.add_field(name='Использование', value=command.usage.format(pref))
+                embed.add_field(name='Описание', value=command.help, inline=False)
+                embed.add_field(name='Использование', value=command.usage.format(pref), inline=False)
                 return await ctx.send(embed=embed)
         return await ctx.send('Нет команды {}'.format(request))
     except Exception as e:

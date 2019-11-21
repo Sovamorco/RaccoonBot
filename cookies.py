@@ -110,8 +110,8 @@ class Cookies(commands.Cog):
             amt = cookies[i][1]['cookies']
             embedValue += '{}. {}: {:,} {}\n\n'.format(i + 1, cookies[i][1]['name'], amt,
                                                        form(amt, ['печенька', 'печеньки', 'печенек']))
-        embed.add_field(name='Глобальный топ', value=embedValue)
-        embed.add_field(name='\u200b', value='\u200b')
+        embed.add_field(name='Глобальный топ', value=embedValue, inline=False)
+        embed.add_field(name='\u200b', value='\u200b', inline=False)
         embedValue = ''
         i = 0
         for holder in cookies:
@@ -122,7 +122,7 @@ class Cookies(commands.Cog):
                 i += 1
                 if i == length:
                     break
-        embed.add_field(name='Топ сервера', value=embedValue)
+        embed.add_field(name='Топ сервера', value=embedValue, inline=False)
         return await ctx.send('{}'.format(ctx.author.mention), embed=embed)
 
     @commands.command(name='blackjack', aliases=['bj'], help='Команда для игры в Блэкджек',

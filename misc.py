@@ -516,39 +516,39 @@ class Misc(commands.Cog):
         embed.set_thumbnail(url='https://shikimori.one' + info['image']['original'])
         if not info['anons']:
             episodes = '{episodes_aired}/{episodes}'.format(**info) if info['ongoing'] else info['episodes']
-            embed.add_field(name='Эпизоды', value=episodes)
+            embed.add_field(name='Эпизоды', value=episodes, inline=False)
         kind = info['kind'].capitalize() + ' (анонс)' if info['anons'] else info['kind'].capitalize()
-        embed.add_field(name='Формат', value=kind)
+        embed.add_field(name='Формат', value=kind, inline=False)
         if any(studio['real'] for studio in info['studios']):
             studios = []
             for studio in info['studios']:
                 if studio['real']:
                     studios += [studio['filtered_name']]
-            embed.add_field(name='Студии', value=', '.join(studios))
+            embed.add_field(name='Студии', value=', '.join(studios), inline=False)
         if info['japanese']:
-            embed.add_field(name='Оригинальное название', value=info['japanese'][0])
+            embed.add_field(name='Оригинальное название', value=info['japanese'][0], inline=False)
         if info['genres']:
-            embed.add_field(name='Жанры', value=', '.join(gen['russian'] for gen in info['genres']))
+            embed.add_field(name='Жанры', value=', '.join(gen['russian'] for gen in info['genres']), inline=False)
         if info['score'] and not info['anons']:
-            embed.add_field(name='Оценка', value=info['score'])
+            embed.add_field(name='Оценка', value=info['score'], inline=False)
         if info['anons']:
             if info['aired_on']:
                 date = datetime.datetime.strptime(info['aired_on'][:-6], '%Y-%m-%dT%H:%M:%S.%f').strftime('%a, %d %b %Y %H:%M')
-                embed.add_field(name='Дата начала показа', value=date)
+                embed.add_field(name='Дата начала показа', value=date, inline=False)
         else:
             if info['released_on'] or info['aired_on']:
                 date = ('Дата окончания показа', info['released_on']) if info['released_on'] and not info['ongoing'] else ('Дата начала показа', info['aired_on'])
                 date = date[0], datetime.datetime.strptime(date[1], '%Y-%m-%d').strftime('%d %b %Y')
-                embed.add_field(name=date[0], value=date[1])
+                embed.add_field(name=date[0], value=date[1], inline=False)
             if info['next_episode_at']:
                 date = datetime.datetime.strptime(info['next_episode_at'][:-6], '%Y-%m-%dT%H:%M:%S.%f').strftime('%a, %d %b %Y %H:%M')
-                embed.add_field(name='Дата выхода следующего эпизода', value=date)
+                embed.add_field(name='Дата выхода следующего эпизода', value=date, inline=False)
         if info['description']:
             desc = info['description']
             desc = re.sub(r'\[([^)]+?)]', '', desc)
             if len(desc) > 300:
                 desc = desc[:300] + '...'
-            embed.add_field(name='Описание', value=desc)
+            embed.add_field(name='Описание', value=desc, inline=False)
         return await ctx.send(embed=embed)
 
     @commands.command(name='changelog', usage='{}changelog', help='Команда, показывающая последние обновления бота')

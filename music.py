@@ -120,14 +120,18 @@ class Music(commands.Cog):
             playlist = playlist.json()['response']
         items = reversed(res['items']) if force else res['items']
         added = 0
+        first = False
         for item in items:
             if item['url']:
                 results = await player.node.get_tracks(item['url'])
                 track = results['tracks'][0]
                 track['info']['author'] = item['artist']
-                track['info']['title'] = item['title']
+                track['info']['title'] = f'{item["artist"]} - {item["title"]}'
                 track['info']['uri'] = f'https://vk.com/music/album/{album}'
                 player.add(requester=ctx.author.id, track=track, index=0) if force else player.add(requester=ctx.author.id, track=track)
+                if not first:
+                    await player.play()
+                    first = True
                 added += 1
         return discord.Embed(color=discord.Color.blue(), title='✅Плейлист добавлен', description=f'{playlist["title"]} - {added} {form(added, ["трек", "трека", "треков"])}')
 
