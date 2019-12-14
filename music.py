@@ -15,7 +15,8 @@ from utils import form, get_prefix, get_color
 from credentials import main_password, discord_pers_id, main_web_addr, gachi_things, genius_token, dev, discord_guild_id,\
     discord_inter_guild_id, discord_inter_afk_channel_id, discord_dev_guild_id, discord_dev_afk_channel_id, vkMusicKey
 
-vk_rx = re.compile(r'https?://(?:www\.)?vk.com/(audios-?[0-9]+\?(?:section=playlists&)?z=audio_playlist-?[0-9]+_[0-9]+|music/album/-?[0-9]+_[0-9]+)')
+vk_album_rx = re.compile(r'https?://(?:www\.)?vk.com/(audios-?[0-9]+\?(?:section=playlists&)?z=audio_playlist-?[0-9]+_[0-9]+|music/album/-?[0-9]+_[0-9]+)')
+vk_pers_rx = re.compile(r'https?://(?:www\.)?vk.com/audios-?[0-9]+')
 url_rx = re.compile(r'https?://(?:www\.)?.+')
 agent = 'KateMobileAndroid/52.1 lite-445 (Android 4.4.2; SDK 19; x86; unknown Android SDK built for x86; en)'
 
@@ -96,7 +97,7 @@ class Music(commands.Cog):
         ws = self.bot._connection._get_websocket(guild_id)
         await ws.voice_state(str(guild_id), channel_id)
 
-    async def vkAdd(self, url, ctx, force=False):
+    async def vk_album_add(self, url, ctx, force=False):
         player = self.bot.lavalink.players.get(ctx.guild.id)
         album = re.search(r'-?[0-9]+_[0-9]+', url)
         if album:
@@ -109,7 +110,7 @@ class Music(commands.Cog):
         }
         params = {
             'access_token': vkMusicKey,
-            'v': '5.103',
+            'v': '5.999',
             'owner_id': user,
             'playlist_id': aid
         }
@@ -135,6 +136,41 @@ class Music(commands.Cog):
                 added += 1
         return discord.Embed(color=discord.Color.blue(), title='✅Плейлист добавлен', description=f'{playlist["title"]} - {added} {form(added, ["трек", "трека", "треков"])}')
 
+    async def vk_pers_add(self, url, ctx, force=False):
+        player = self.bot.lavalink.players.get(ctx.guild.id)
+        user = re.search(r'-?[0-9]+', url)
+        if user:
+            user = user.group()
+        else:
+            return discord.Embed(color=discord.Color.blue(), title='❌Плейлист не найден')
+        headers = {
+            'User-Agent': agent
+        }
+        params = {
+            'access_token': vkMusicKey,
+            'v': '5.999',
+            'owner_id': user
+        }
+        async with httpx.AsyncClient() as client:
+            playlist = await client.get('https://api.vk.com/method/audio.get', headers=headers, params=params)
+            playlist = playlist.json()['response']
+        items = reversed(playlist['items']) if force else playlist['items']
+        added = 0
+        first = False
+        for item in items:
+            if item['url']:
+                results = await player.node.get_tracks(item['url'])
+                track = results['tracks'][0]
+                track['info']['author'] = item['artist']
+                track['info']['title'] = f'{item["artist"]} - {item["title"]}'
+                track['info']['uri'] = f'https://vk.com/audios/{user}'
+                player.add(requester=ctx.author.id, track=track, index=0) if force else player.add(requester=ctx.author.id, track=track)
+                if not first:
+                    await player.play()
+                    first = True
+                added += 1
+        return discord.Embed(color=discord.Color.blue(), title='✅Плейлист добавлен', description=f'{playlist["title"]} - {added} {form(added, ["трек", "трека", "треков"])}')
+
     @commands.command(aliases=['p'], usage='{}[p|play] <ссылка/название>', help='Команда для проигрывания музыки')
     async def play(self, ctx, *, query: str = ''):
         player = self.bot.lavalink.players.get(ctx.guild.id)
@@ -148,8 +184,10 @@ class Music(commands.Cog):
             else:
                 return await ctx.send(f'Использование: {pref}[p|play] <ссылка/название>')
         query = query.strip('<>')
-        if vk_rx.match(query):
-            embed = await self.vkAdd(query, ctx)
+        if vk_album_rx.match(query):
+            embed = await self.vk_album_add(query, ctx)
+        elif vk_pers_rx.match(query):
+            embed = await self.vk_pers_add(query, ctx)
         else:
             if not url_rx.match(query):
                 query = f'ytsearch:{query}'
@@ -208,8 +246,10 @@ class Music(commands.Cog):
         if not query:
             return await ctx.send(f'Использование: {pref}[fp|force] <ссылка/название>')
         query = query.strip('<>')
-        if vk_rx.match(query):
-            embed = await self.vkAdd(query, ctx, force=True)
+        if vk_album_rx.match(query):
+            embed = await self.vk_album_add(query, ctx, force=True)
+        elif vk_pers_rx.match(query):
+            embed = await self.vk_pers_add(query, ctx, force=True)
         else:
             if not url_rx.match(query):
                 query = f'ytsearch:{query}'
