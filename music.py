@@ -156,7 +156,7 @@ class Music(commands.Cog):
             playlist = await client.get('https://api.vk.com/method/audio.get', headers=headers, params=params)
             playlist = playlist.json()['response']
         items = playlist['items']
-        user = items.pop(0)
+        user_info = items.pop(0)
         if force:
             items = reversed(items)
         added = 0
@@ -173,7 +173,7 @@ class Music(commands.Cog):
                     await player.play()
                     first = True
                 added += 1
-        return discord.Embed(color=discord.Color.blue(), title='✅Плейлист добавлен', description=f'Аудиозаписи {user["name_gen"]} - {added} {form(added, ["трек", "трека", "треков"])}')
+        return discord.Embed(color=discord.Color.blue(), title='✅Плейлист добавлен', description=f'Аудиозаписи {user_info["name_gen"]} - {added} {form(added, ["трек", "трека", "треков"])}')
 
     @commands.command(aliases=['p'], usage='{}[p|play] <ссылка/название>', help='Команда для проигрывания музыки')
     async def play(self, ctx, *, query: str = ''):
