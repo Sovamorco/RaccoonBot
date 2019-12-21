@@ -75,7 +75,7 @@ class Music(commands.Cog):
             if after.channel and after.channel.id == self.afk_channel and before.channel and before.channel.id != after.channel.id:
                 return await member.send('Вы были перемещены в АФК-канал')
 
-    class musicCommandError(commands.CommandInvokeError):
+    class MusicCommandError(commands.CommandInvokeError):
         pass
 
     def cog_unload(self):
@@ -89,7 +89,7 @@ class Music(commands.Cog):
 
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.CommandInvokeError) and str(error.original):
-            if isinstance(error, self.musicCommandError):
+            if isinstance(error, self.MusicCommandError):
                 return await ctx.send(str(error.original))
             return await ctx.send('Ошибка:\n' + str(error.original))
 
@@ -149,12 +149,16 @@ class Music(commands.Cog):
         params = {
             'access_token': vkMusicKey,
             'v': '5.999',
-            'owner_id': user
+            'owner_id': user,
+            'need_user': 1
         }
         async with httpx.AsyncClient() as client:
             playlist = await client.get('https://api.vk.com/method/audio.get', headers=headers, params=params)
             playlist = playlist.json()['response']
-        items = reversed(playlist['items']) if force else playlist['items']
+        items = playlist['items']
+        user = items.pop(0)
+        if force:
+            items = reversed(items)
         added = 0
         first = False
         for item in items:
@@ -169,7 +173,7 @@ class Music(commands.Cog):
                     await player.play()
                     first = True
                 added += 1
-        return discord.Embed(color=discord.Color.blue(), title='✅Плейлист добавлен', description=f'{playlist["title"]} - {added} {form(added, ["трек", "трека", "треков"])}')
+        return discord.Embed(color=discord.Color.blue(), title='✅Плейлист добавлен', description=f'Аудиозаписи {user["name_gen"]} - {added} {form(added, ["трек", "трека", "треков"])}')
 
     @commands.command(aliases=['p'], usage='{}[p|play] <ссылка/название>', help='Команда для проигрывания музыки')
     async def play(self, ctx, *, query: str = ''):
@@ -665,13 +669,13 @@ class Music(commands.Cog):
         if ignored:
             return
         if not ctx.author.voice or not ctx.author.voice.channel:
-            raise self.musicCommandError('Сначала подключитесь к голосовому каналу')
+            raise self.MusicCommandError('Сначала подключитесь к голосовому каналу')
         if not player.is_connected:
             if not should_connect:
-                raise self.musicCommandError('Я не подключен к каналу')
+                raise self.MusicCommandError('Я не подключен к каналу')
             permissions = ctx.author.voice.channel.permissions_for(ctx.me)
             if not permissions.connect or not permissions.speak:
-                raise self.musicCommandError('I need the `CONNECT` and `SPEAK` permissions.')
+                raise self.MusicCommandError('I need the `CONNECT` and `SPEAK` permissions.')
             player.store('channel', ctx.channel.id)
             await self.connect_to(ctx.guild.id, str(ctx.author.voice.channel.id))
         else:
@@ -680,7 +684,7 @@ class Music(commands.Cog):
             if should_connect:
                 return await self.connect_to(ctx.guild.id, str(ctx.author.voice.channel.id))
             if int(player.channel_id) != ctx.author.voice.channel.id:
-                raise self.musicCommandError('Мы в разных голосовых каналах')
+                raise self.MusicCommandError('Мы в разных голосовых каналах')
 
 
 def music_setup(bot):
