@@ -17,7 +17,7 @@ def prefix(dbot, msg):
     return commands.when_mentioned_or(pr)(dbot, msg)
 
 
-bot = commands.Bot(command_prefix=prefix, description='Cutest bot on Discord (subjective)')
+bot = commands.Bot(command_prefix=prefix, description='Cutest bot on Discord (subjective)', case_insensitive=True)
 bot.remove_command('help')
 
 

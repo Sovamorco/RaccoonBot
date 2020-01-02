@@ -13,12 +13,11 @@ import time
 import git
 import json
 import asyncio
+from aiohttp_socks import ProxyConnector
+import aiohttp
 import datetime
 import locale
 
-proxies = {
-    'all': 'http://51.68.141.240:3128'
-}
 locale.setlocale(locale.LC_ALL, 'ru_RU')
 
 
@@ -75,9 +74,10 @@ class Misc(commands.Cog):
         user = ctx.author
         if msg is None:
             msg = user.mention
-        async with httpx.AsyncClient(proxies=proxies) as client:
+        proxy = ProxyConnector.from_url('socks4://180.250.253.155:45123')
+        async with aiohttp.ClientSession(connector=proxy) as client:
             image = await client.get('http://inspirobot.me/api?generate=true')
-            image = image.text
+            image = await image.text()
         embed = discord.Embed(color=discord.Color.dark_purple())
         embed.set_image(url=image)
         return await ctx.send(msg, embed=embed)
