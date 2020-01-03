@@ -2,7 +2,7 @@ import math
 import re
 import random
 import json
-import httpx
+import aiohttp
 import asyncio
 
 from tts import *
@@ -21,7 +21,7 @@ url_rx = re.compile(r'https?://(?:www\.)?.+')
 agent = 'KateMobileAndroid/52.1 lite-445 (Android 4.4.2; SDK 19; x86; unknown Android SDK built for x86; en)'
 
 
-# noinspection PyProtectedMember,PyTypeChecker
+# noinspection PyProtectedMember
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -114,11 +114,15 @@ class Music(commands.Cog):
             'owner_id': user,
             'playlist_id': aid
         }
-        async with httpx.AsyncClient() as client:
+        async with aiohttp.ClientSession() as client:
             res = await client.get('https://api.vk.com/method/audio.get', headers=headers, params=params)
             playlist = await client.get('https://api.vk.com/method/audio.getPlaylistById', headers=headers, params=params)
-            res = res.json()['response']
-            playlist = playlist.json()['response']
+            res = await res.json()
+            playlist = await playlist.json()
+        if 'error' in res.keys() and res['error']['error_code'] == 201:
+            return discord.Embed(color=discord.Color.blue(), title='❌Нет доступа к аудио пользователя')
+        res = res['response']
+        playlist = playlist['response']
         items = reversed(res['items']) if force else res['items']
         added = 0
         first = False
@@ -152,9 +156,12 @@ class Music(commands.Cog):
             'owner_id': user,
             'need_user': 1
         }
-        async with httpx.AsyncClient() as client:
+        async with aiohttp.ClientSession() as client:
             playlist = await client.get('https://api.vk.com/method/audio.get', headers=headers, params=params)
-            playlist = playlist.json()['response']
+            playlist = await playlist.json()
+        if 'error' in playlist.keys() and playlist['error']['error_code'] == 201:
+            return discord.Embed(color=discord.Color.blue(), title='❌Нет доступа к аудио пользователя')
+        playlist = playlist['response']
         items = playlist['items']
         user_info = items.pop(0)
         if force:
@@ -423,9 +430,10 @@ class Music(commands.Cog):
         headers = {
             'Authorization': 'Bearer ' + genius_token
         }
-        async with httpx.AsyncClient() as client:
+        async with aiohttp.ClientSession() as client:
             req = await client.get('https://api.genius.com/search', params=params, headers=headers)
-        result = req.json()['response']['hits']
+            req = await req.json()
+        result = req['response']['hits']
         if len(result) == 0:
             return await ctx.send('Песня не найдена')
         else:
@@ -434,9 +442,10 @@ class Music(commands.Cog):
                 if result['result']['lyrics_state'] == 'complete':
                     url = result['result']['url']
                     title = '{} - {}'.format(result['result']['primary_artist']['name'], result['result']['title'])
-                    async with httpx.AsyncClient() as client:
+                    async with aiohttp.ClientSession() as client:
                         lyrics = await client.get(url)
-                    soup = BeautifulSoup(lyrics.text, 'html.parser')
+                        lyrics = await lyrics.text()
+                    soup = BeautifulSoup(lyrics, 'html.parser')
                     lyrics = soup.p.get_text()
                     if len(lyrics) > 4000:
                         return await ctx.send('Слишком длинный текст, скорее всего это не текст песни')

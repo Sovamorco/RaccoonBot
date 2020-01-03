@@ -1,4 +1,4 @@
-import httpx
+import aiohttp
 from discord.ext import commands
 import discord
 from enum import IntFlag
@@ -41,21 +41,20 @@ class osumods(IntFlag):
     LastMod = 1073741824
 
 
-# noinspection PyTypeChecker
 class Games(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.cards = {}
 
     async def init(self):
-        async with httpx.AsyncClient() as client:
+        async with aiohttp.ClientSession() as client:
             try:
                 cards = await client.get('https://sv.bagoum.com/cardsFullJSON')
-                self.cards = cards.json()
+                self.cards = await cards.json()
             except Exception as e:
                 print(e)
                 cards = await client.get('https://sv.bagoum.com/cardsFullJSON')
-                self.cards = cards.json()
+                self.cards = await cards.json()
 
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.CommandInvokeError) and str(error.original):
@@ -72,9 +71,9 @@ class Games(commands.Cog):
             'k': osu_key,
             'u': nickname
         }
-        async with httpx.AsyncClient() as client:
+        async with aiohttp.ClientSession() as client:
             r = await client.get(api_link + 'get_user', params=params, timeout=2)
-            r = r.json()
+            r = await r.json()
         if not r:
             return await ctx.send('Пользователь не найден')
         result = r[0]
@@ -104,9 +103,9 @@ class Games(commands.Cog):
             'k': osu_key,
             'u': nickname
         }
-        async with httpx.AsyncClient() as client:
+        async with aiohttp.ClientSession() as client:
             plays = await client.get(api_link + 'get_user_best', params=params, timeout=2)
-            plays = plays.json()
+            plays = await plays.json()
         if not plays:
             return await ctx.send('Пользователь не найден')
         embed = discord.Embed(color=discord.Color.dark_purple(), description='Loading...')
@@ -117,9 +116,10 @@ class Games(commands.Cog):
                 'k': osu_key,
                 'b': plays[i]['beatmap_id']
             }
-            async with httpx.AsyncClient() as client:
+            async with aiohttp.ClientSession() as client:
                 info = await client.get(api_link + 'get_beatmaps', params=params)
-                info = info.json()[0]
+                info = await info.json()
+                info = info[0]
             accuracy = round(
                 (int(plays[i]['count300']) * 300 + int(plays[i]['count100']) * 100 + int(
                     plays[i]['count50']) * 50) / (
@@ -266,9 +266,9 @@ class Games(commands.Cog):
                       usage='{}svupdate')
     async def update_(self, ctx):
         try:
-            async with httpx.AsyncClient() as client:
+            async with aiohttp.ClientSession() as client:
                 cards = await client.get('https://sv.bagoum.com/cardsFullJSON')
-                self.cards = cards.json()
+                self.cards = await cards.json()
             return await ctx.send('База данных карт успешно обновлена')
         except Exception as e:
             return await ctx.send('При обновлении базы данных карт произошла ошибка. Подробнее:\n{}'.format(e))

@@ -1,6 +1,5 @@
 from discord.ext import commands
 import discord
-import httpx
 from json import load
 from random import choice
 from html import unescape
@@ -31,9 +30,9 @@ async def shiki_refresh(rt):
     headers = {
         'User-Agent': 'RaccoonBot'
     }
-    async with httpx.AsyncClient() as client:
+    async with aiohttp.ClientSession() as client:
         req = await client.post('https://shikimori.one/oauth/token', data=payload, headers=headers)
-        req = req.json()
+        req = await req.json()
     json.dump(req, open('resources/shiki.json', 'w+'))
 
 
@@ -45,7 +44,6 @@ async def refresh_shiki_token():
         await asyncio.sleep(3600)
 
 
-# noinspection PyTypeChecker
 class Misc(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -76,7 +74,10 @@ class Misc(commands.Cog):
             msg = user.mention
         proxy = ProxyConnector.from_url('socks4://180.250.253.155:45123')
         async with aiohttp.ClientSession(connector=proxy) as client:
-            image = await client.get('http://inspirobot.me/api?generate=true')
+            try:
+                image = await client.get('http://inspirobot.me/api?generate=true')
+            except aiohttp.ClientProxyConnectionError:
+                return await ctx.send('Ошибка подключения к прокси')
             image = await image.text()
         embed = discord.Embed(color=discord.Color.dark_purple())
         embed.set_image(url=image)
@@ -94,7 +95,7 @@ class Misc(commands.Cog):
         embed = discord.Embed(color=discord.Color.dark_purple(), description=fact)
         return await ctx.send(msg, embed=embed)
 
-    @commands.command(name='wikia', aliases=['wiki'], help='Команда для поиска статей на Fandom',
+    @commands.command(name='wikia', aliases=['wiki'], help='Команда для поиска статей на Fandom\nКриво работает, лучше использовать команду fandom',
                       usage='{}[wikia|wiki] <запрос>')
     async def wikia_(self, ctx, *, query=None):
         try:
@@ -112,9 +113,9 @@ class Misc(commands.Cog):
                 'batch': 1,
                 'rank': 'default'
             }
-            async with httpx.AsyncClient() as client:
+            async with aiohttp.ClientSession() as client:
                 result = await client.get(apiurl, params=params, timeout=0.5)
-                result = result.json()
+                result = await result.json()
             if 'exception' in result.keys():
                 return await ctx.send('Ничего не найдено')
             results = result['items']
@@ -160,9 +161,9 @@ class Misc(commands.Cog):
                 'batch': 1
             }
             try:
-                async with httpx.AsyncClient() as client:
+                async with aiohttp.ClientSession() as client:
                     result = await client.get(apiurl + 'Search/List', params=params, timeout=0.5)
-                    result = result.json()
+                    result = await result.json()
             except Exception as e:
                 await ctx.send('Ничего не найдено')
                 return print(e)
@@ -175,9 +176,9 @@ class Misc(commands.Cog):
                 'width': 200,
                 'height': 200
             }
-            async with httpx.AsyncClient() as client:
+            async with aiohttp.ClientSession() as client:
                 result = await client.get(apiurl + 'Articles/Details', params=params, timeout=0.5)
-                result = result.json()
+                result = await result.json()
             basepath = result['basepath']
             result = result['items'][str(page_id)]
             page_url = basepath + result['url']
@@ -192,8 +193,8 @@ class Misc(commands.Cog):
                     params = {
                         'ids': page_id,
                         'abstract': 0,
-                        'width': width,
-                        'height': height
+                        'width': int(width),
+                        'height': int(height)
                     }
                 else:
                     ratio = height / width
@@ -202,18 +203,18 @@ class Misc(commands.Cog):
                     params = {
                         'ids': page_id,
                         'abstract': 0,
-                        'width': width,
-                        'height': height
+                        'width': int(width),
+                        'height': int(height)
                     }
-                async with httpx.AsyncClient() as client:
+                async with aiohttp.ClientSession() as client:
                     result = await client.get(apiurl + 'Articles/Details', params=params, timeout=0.5)
-                    result = result.json()
+                    result = await result.json()
                 thumb = result['items'][str(page_id)]['thumbnail']
             embed = discord.Embed(color=discord.Color.dark_purple(), title=title, url=page_url, description=desc)
             if thumb is not None:
                 embed.set_thumbnail(url=thumb)
             return await ctx.send(user.mention, embed=embed)
-        except httpx.exceptions.ConnectTimeout:
+        except aiohttp.ServerTimeoutError:
             await ctx.send('Не удалось подключиться к Wikia')
 
     @commands.command(name='fandom', help='Вторая команда для поиска статей на Fandom',
@@ -234,9 +235,9 @@ class Misc(commands.Cog):
                 'batch': 1,
                 'rank': 'default'
             }
-            async with httpx.AsyncClient() as client:
+            async with aiohttp.ClientSession() as client:
                 result = await client.get(apiurl, params=params, timeout=0.5)
-                result = result.json()
+                result = await result.json()
             if 'exception' in result.keys():
                 return await ctx.send('Ничего не найдено')
             results = result['items']
@@ -251,9 +252,9 @@ class Misc(commands.Cog):
                         new_results.append(result)
             if len(new_results) < 10:
                 params['lang'] = 'ru'
-                async with httpx.AsyncClient() as client:
+                async with aiohttp.ClientSession() as client:
                     result = await client.get(apiurl, params=params, timeout=0.5)
-                    result = result.json()
+                    result = await result.json()
                 if 'exception' in result.keys():
                     pass
                 else:
@@ -314,9 +315,9 @@ class Misc(commands.Cog):
                 'batch': 1
             }
             try:
-                async with httpx.AsyncClient() as client:
+                async with aiohttp.ClientSession() as client:
                     result = await client.get(apiurl + 'Search/List', params=params, timeout=0.5)
-                    result = result.json()
+                    result = await result.json()
             except Exception as e:
                 embed = discord.Embed(color=discord.Color.dark_purple(), title='Ошибка', description='Ничего не найдено')
                 await choicemsg.edit(embed=embed)
@@ -331,9 +332,9 @@ class Misc(commands.Cog):
                 'width': 200,
                 'height': 200
             }
-            async with httpx.AsyncClient() as client:
+            async with aiohttp.ClientSession() as client:
                 result = await client.get(apiurl + 'Articles/Details', params=params, timeout=0.5)
-                result = result.json()
+                result = await result.json()
             basepath = result['basepath']
             result = result['items'][str(page_id)]
             page_url = basepath + result['url']
@@ -348,8 +349,8 @@ class Misc(commands.Cog):
                     params = {
                         'ids': page_id,
                         'abstract': 0,
-                        'width': width,
-                        'height': height
+                        'width': int(width),
+                        'height': int(height)
                     }
                 else:
                     ratio = height / width
@@ -358,18 +359,18 @@ class Misc(commands.Cog):
                     params = {
                         'ids': page_id,
                         'abstract': 0,
-                        'width': width,
-                        'height': height
+                        'width': int(width),
+                        'height': int(height)
                     }
-                async with httpx.AsyncClient() as client:
+                async with aiohttp.ClientSession() as client:
                     result = await client.get(apiurl + 'Articles/Details', params=params, timeout=0.5)
-                    result = result.json()
+                    result = await result.json()
                 thumb = result['items'][str(page_id)]['thumbnail']
             embed = discord.Embed(color=discord.Color.dark_purple(), title=title, url=page_url, description=desc)
             if thumb is not None:
                 embed.set_thumbnail(url=thumb)
             return await choicemsg.edit(content=user.mention, embed=embed)
-        except httpx.exceptions.ConnectTimeout:
+        except aiohttp.ServerTimeoutError:
             await ctx.send('Не удалось подключиться к Wikia')
 
     @commands.command(aliases=['l'], usage='{}[l|lyrics] <запрос>', help='Команда для поиска текста песен')
@@ -386,9 +387,10 @@ class Misc(commands.Cog):
         headers = {
             'Authorization': 'Bearer ' + genius_token
         }
-        async with httpx.AsyncClient() as client:
+        async with aiohttp.ClientSession() as client:
             req = await client.get('https://api.genius.com/search', params=params, headers=headers)
-        r = req.json()['response']['hits']
+            req = await req.json()
+        r = req['response']['hits']
         if len(r) == 0:
             return await ctx.send('Песни не найдены')
         else:
@@ -424,9 +426,10 @@ class Misc(commands.Cog):
             result = new_results[int(msg.content) - 1]
             url = result['result']['url']
             title = '{} - {}'.format(result['result']['primary_artist']['name'], result['result']['title'])
-            async with httpx.AsyncClient() as client:
+            async with aiohttp.ClientSession() as client:
                 lyrics = await client.get(url)
-            soup = BeautifulSoup(lyrics.text, 'html.parser')
+                lyrics = await lyrics.text()
+            soup = BeautifulSoup(lyrics, 'html.parser')
             lyrics = soup.p.get_text()
             if len(lyrics) > 2000:
                 lyrlist = lyrics.split('\n')
@@ -479,9 +482,9 @@ class Misc(commands.Cog):
             'search': query,
             'order': 'popularity'
         }
-        async with httpx.AsyncClient() as client:
+        async with aiohttp.ClientSession() as client:
             results = await client.get('https://shikimori.one/api/animes', headers=headers, params=params)
-            results = results.json()
+            results = await results.json()
         embed = discord.Embed(color=discord.Color.dark_purple())
         if not results:
             embed.description = 'Ничего не найдено'
@@ -510,9 +513,9 @@ class Misc(commands.Cog):
             result = results[0]
         title = result['russian'] if result['russian'] else result['name']
         embed = discord.Embed(color=discord.Color.dark_purple(), title=title, url='https://shikimori.one' + result['url'])
-        async with httpx.AsyncClient() as client:
+        async with aiohttp.ClientSession() as client:
             info = await client.get(f'https://shikimori.one/api/animes/{result["id"]}', headers=headers)
-            info = info.json()
+            info = await info.json()
         embed.set_thumbnail(url='https://shikimori.one' + info['image']['original'])
         if not info['anons']:
             episodes = '{episodes_aired}/{episodes}'.format(**info) if info['ongoing'] else info['episodes']

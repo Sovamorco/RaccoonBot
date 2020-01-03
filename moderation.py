@@ -5,7 +5,7 @@ import json
 import os
 from time import time
 from credentials import discord_pers_id, shiki_auth_link, shiki_client_id, shiki_client_secret
-import httpx
+import aiohttp
 
 
 class Moderation(commands.Cog):
@@ -113,9 +113,9 @@ class Moderation(commands.Cog):
             headers = {
                 'User-Agent': 'RaccoonBot'
             }
-            async with httpx.AsyncClient() as client:
+            async with aiohttp.ClientSession() as client:
                 req = await client.post('https://shikimori.one/oauth/token', data=payload, headers=headers)
-                req = req.json()
+                req = await req.json()
             return json.dump(req, open('resources/shiki.json', 'w+'))
 
 
