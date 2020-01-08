@@ -30,9 +30,12 @@ class Neons(commands.Cog):
         profiles = json.load(open('../Monokuma/MonoKuma/profiles.json', 'r'))
         for user in profiles:
             if profiles[user]['discord']['user_name'].lower() == str(ctx.author).lower():
+                integ = json.load(open('resources/integrations.json', 'r'))
                 profiles[user]['discord']['user_id'] = ctx.author.id
                 profiles[user]['discord']['confirmed'] = True
+                integ[str(ctx.author.id)] = user
                 json.dump(profiles, open('../Monokuma/MonoKuma/profiles.json', 'w'), indent=4, ensure_ascii=False)
+                json.dump(integ, open('resources/integrations.json', 'w'))
                 return await ctx.send('Профиль успешно привязан')
         return await ctx.send('Профиль не найден. Проверьте правильность написания ника в дискорде при привязке и попробуйте еще раз')
 
