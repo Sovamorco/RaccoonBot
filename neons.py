@@ -17,29 +17,30 @@ class Neons(commands.Cog):
         if isinstance(error, commands.CommandInvokeError) and str(error.original):
             await ctx.send('Ошибка:\n' + str(error.original))
 
-    @commands.Cog.listener()
-    async def on_message(self, msg):
-        if msg.guild.id == discord_via_id:
-            profiles = json.load(open(self.profiles_path, 'r'))
-            integ = json.load(open('resources/integrations.json', 'r'))
-            if str(msg.author.id) in integ.keys():
-                profiles[integ[str(msg.author.id)]]['neons'] += 1
-            json.dump(profiles, open(self.profiles_path, 'w'), indent=4, ensure_ascii=False)
+    # @commands.Cog.listener()
+    # async def on_message(self, msg):
+    #     if msg.guild.id == discord_via_id:
+    #         profiles = json.load(open(self.profiles_path, 'r'))
+    #         integ = json.load(open('resources/integrations.json', 'r'))
+    #         if str(msg.author.id) in integ.keys():
+    #             profiles[integ[str(msg.author.id)]]['neons'] += 1
+    #         json.dump(profiles, open(self.profiles_path, 'w'), indent=4, ensure_ascii=False)
 
-    @commands.check(via_check)
-    @commands.command(aliases=['vc'], help='Команда для связи аккаунта вк с аккаунтом дискорда', usage='{}[vk_connect|vc]')
-    async def vk_connect(self, ctx):
-        profiles = json.load(open(self.profiles_path, 'r'))
-        for user in profiles:
-            if profiles[user]['discord']['user_name'].lower() == str(ctx.author).lower():
-                integ = json.load(open('resources/integrations.json', 'r'))
-                profiles[user]['discord']['user_id'] = ctx.author.id
-                profiles[user]['discord']['confirmed'] = True
-                integ[str(ctx.author.id)] = user
-                json.dump(profiles, open(self.profiles_path, 'w'), indent=4, ensure_ascii=False)
-                json.dump(integ, open('resources/integrations.json', 'w'))
-                return await ctx.send('Профиль успешно привязан')
-        return await ctx.send('Профиль не найден. Проверьте правильность написания ника в дискорде при привязке и попробуйте еще раз')
+    # @commands.check(via_check)
+    # @commands.command(aliases=['vc'], help='Команда для связи аккаунта вк с аккаунтом дискорда', usage='{}[vk_connect|vc]')
+    # async def vk_connect(self, ctx):
+    #     profiles = json.load(open(self.profiles_path, 'r'))
+    #     for user in profiles:
+    #         if profiles[user]['discord']['user_name'].lower() == str(ctx.author).lower():
+    #             integ = json.load(open('resources/integrations.json', 'r'))
+    #             profiles[user]['discord']['user_name'] = str(ctx.author)
+    #             profiles[user]['discord']['user_id'] = ctx.author.id
+    #             profiles[user]['discord']['confirmed'] = True
+    #             integ[str(ctx.author.id)] = user
+    #             json.dump(profiles, open(self.profiles_path, 'w'), indent=4, ensure_ascii=False)
+    #             json.dump(integ, open('resources/integrations.json', 'w'))
+    #             return await ctx.send('Профиль успешно привязан')
+    #     return await ctx.send('Профиль не найден. Проверьте правильность написания ника в дискорде при привязке и попробуйте еще раз')
 
     @commands.check(via_check)
     @commands.command(aliases=['vp'], help='Команда для просмотра профиля VIA', usage='{}[via_profile|vp]')
