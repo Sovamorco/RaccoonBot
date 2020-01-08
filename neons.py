@@ -19,9 +19,9 @@ class Neons(commands.Cog):
     async def on_message(self, msg):
         if msg.guild.id == discord_via_id:
             profiles = json.load(open('../Monokuma/MonoKuma/profiles.json', 'r'))
-            for user in profiles:
-                if profiles[user]['discord']['user_id'] and profiles[user]['discord']['confirmed']:
-                    profiles[user]['neons'] += 1
+            integ = json.load(open('resources/integrations.json', 'r'))
+            if str(msg.author.id) in integ.keys():
+                profiles[integ[str(msg.author.id)]]['neons'] += 1
             json.dump(profiles, open('../Monokuma/MonoKuma/profiles.json', 'w'), indent=4, ensure_ascii=False)
 
     @commands.check(via_check)
