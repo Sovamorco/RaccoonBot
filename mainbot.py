@@ -4,6 +4,7 @@ from misc import *
 from games import *
 from cookies import *
 from moderation import *
+from neons import *
 from credentials import discord_status, discord_bot_token, discord_alpha_token, dev
 from utils import get_prefix
 
@@ -41,6 +42,7 @@ async def on_ready():
         cookies_setup(bot)
         await games_setup(bot)
         mod_setup(bot)
+        neons_setup(bot)
     except discord.errors.ClientException:
         pass
     if not dev:

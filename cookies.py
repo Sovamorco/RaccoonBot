@@ -125,7 +125,7 @@ class Cookies(commands.Cog):
         embed.add_field(name='Топ сервера', value=embedValue, inline=False)
         return await ctx.send('{}'.format(ctx.author.mention), embed=embed)
 
-    @commands.command(name='blackjack', aliases=['bj'], help='Команда для игры в Блэкджек',
+    @commands.command(name='blackjack', aliases=['bj'], help='Команда для игры в Блэкджек\nПравила:\n- Дилер перестает брать на 17',
                       usage='{}[bj|blackjack] <ставка>')
     async def bj_(self, ctx, amt: int = 0):
         if amt <= 0:
@@ -293,6 +293,10 @@ class Cookies(commands.Cog):
                     cookies = get_cookies(user.id)
                     embed.description += '\nУ вас больше очков, чем у дилера\nВы победили\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
                     await msg.edit(embed=embed)
+
+    @commands.command(name='gamble', help='Команда для игры в Рулетку', usage='{}gamble <ставка>', hidden=True)
+    async def gamble_(self, ctx, amt: int = 0):
+        pass
 
 
 def cookies_setup(bot):
