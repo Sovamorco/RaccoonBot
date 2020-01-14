@@ -1,4 +1,10 @@
 from discord import Color
+import aiomysql
+from json import loads, dumps
+from credentials import dev, SQLHost, SQLUser, SQLPass
+
+host = SQLHost if dev else '127.0.0.1'
+config = {'host': host, 'port': 3306, 'user': SQLUser, 'password': SQLPass, 'db': 'via', 'autocommit': True}
 
 
 def form(num, arr):
@@ -34,3 +40,42 @@ def get_color(track):
     if 'vkuseraudio' in track:
         return Color.blue()
     return Color.greyple()
+
+
+async def load_profiles():
+    pool = await aiomysql.create_pool(**config)
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT `user_id`, `profile` FROM `profiles`")
+            profiles = await cur.fetchall()
+    pool.close()
+    await pool.wait_closed()
+    new_profiles = {}
+    for profile in profiles:
+        new_profiles[profile[0]] = loads(profile[1])
+    return new_profiles
+
+
+async def load_profile(uid):
+    pool = await aiomysql.create_pool(**config)
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT `profile` FROM `profiles` WHERE `user_id`=%s", [uid])
+            try:
+                (r,) = await cur.fetchone()
+            except TypeError:
+                r = None
+    pool.close()
+    await pool.wait_closed()
+    result = loads(r) if r else None
+    return result
+
+
+async def dump_profile(uid, profile):
+    pool = await aiomysql.create_pool(**config)
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            profile = dumps(profile, ensure_ascii=False)
+            await cur.execute("INSERT INTO `profiles` (user_id, profile) VALUES (%s, %s) ON DUPLICATE KEY UPDATE profile=%s", [uid, profile, profile])
+    pool.close()
+    await pool.wait_closed()

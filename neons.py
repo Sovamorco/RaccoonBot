@@ -1,6 +1,7 @@
+from utils import *
 from discord.ext import commands
 import json
-from credentials import discord_via_id, dev
+from credentials import discord_via_id
 import discord
 
 
@@ -11,36 +12,26 @@ def via_check(ctx):
 class Neons(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.profiles_path = 'resources/profiles.json' if dev else '../Monokuma/MonoKuma/profiles.json'
 
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.CommandInvokeError) and str(error.original):
             await ctx.send('Ошибка:\n' + str(error.original))
 
-    # @commands.Cog.listener()
-    # async def on_message(self, msg):
-    #     if msg.guild.id == discord_via_id:
-    #         profiles = json.load(open(self.profiles_path, 'r'))
-    #         integ = json.load(open('resources/integrations.json', 'r'))
-    #         if str(msg.author.id) in integ.keys():
-    #             profiles[integ[str(msg.author.id)]]['neons'] += 1
-    #         json.dump(profiles, open(self.profiles_path, 'w'), indent=4, ensure_ascii=False)
-
-    # @commands.check(via_check)
-    # @commands.command(aliases=['vc'], help='Команда для связи аккаунта вк с аккаунтом дискорда', usage='{}[vk_connect|vc]')
-    # async def vk_connect(self, ctx):
-    #     profiles = json.load(open(self.profiles_path, 'r'))
-    #     for user in profiles:
-    #         if profiles[user]['discord']['user_name'].lower() == str(ctx.author).lower():
-    #             integ = json.load(open('resources/integrations.json', 'r'))
-    #             profiles[user]['discord']['user_name'] = str(ctx.author)
-    #             profiles[user]['discord']['user_id'] = ctx.author.id
-    #             profiles[user]['discord']['confirmed'] = True
-    #             integ[str(ctx.author.id)] = user
-    #             json.dump(profiles, open(self.profiles_path, 'w'), indent=4, ensure_ascii=False)
-    #             json.dump(integ, open('resources/integrations.json', 'w'))
-    #             return await ctx.send('Профиль успешно привязан')
-    #     return await ctx.send('Профиль не найден. Проверьте правильность написания ника в дискорде при привязке и попробуйте еще раз')
+    @commands.check(via_check)
+    @commands.command(aliases=['vc'], help='Команда для связи аккаунта вк с аккаунтом дискорда', usage='{}[vk_connect|vc]')
+    async def vk_connect(self, ctx):
+        profiles = await load_profiles()
+        for user in profiles:
+            if profiles[user]['discord']['user_name'].lower() == str(ctx.author).lower():
+                integ = json.load(open('resources/integrations.json', 'r'))
+                profiles[user]['discord']['user_name'] = str(ctx.author)
+                profiles[user]['discord']['user_id'] = ctx.author.id
+                profiles[user]['discord']['confirmed'] = True
+                integ[str(ctx.author.id)] = user
+                await dump_profile(user, profiles[user])
+                json.dump(integ, open('resources/integrations.json', 'w'))
+                return await ctx.send('Профиль успешно привязан')
+        return await ctx.send('Профиль не найден. Проверьте правильность написания ника в дискорде при привязке и попробуйте еще раз')
 
     @commands.check(via_check)
     @commands.command(aliases=['vp'], help='Команда для просмотра профиля VIA', usage='{}[via_profile|vp]')
@@ -49,8 +40,7 @@ class Neons(commands.Cog):
         if str(ctx.author.id) not in integ.keys():
             return await ctx.send('Профиль VIA не привязан')
         embed = discord.Embed(title='Профиль VIA', description='', color=discord.Color.dark_purple())
-        profiles = json.load(open(self.profiles_path, 'r'))
-        target = profiles[integ[str(ctx.author.id)]]
+        target = await load_profile(integ[str(ctx.author.id)])
         embed.description += f'Неонов - {target["neons"]}\n\n'
         embed.description += f'Осколков - {target["oskolki"]}\n\n'
 
@@ -58,7 +48,8 @@ class Neons(commands.Cog):
             embed.description += 'Не в браке\n\n'
         elif target["brak"][1] == 0:
             second = target["brak"][0]
-            sid = profiles[str(second)]['discord']['user_id']
+            sprof = await load_profile(second)
+            sid = sprof['discord']['user_id']
             if sid:
                 embed.description += f'В браке с {self.bot.get_user(sid).display_name}\n\n'
             else:
@@ -68,7 +59,8 @@ class Neons(commands.Cog):
 
         if target["rab"][0] == 1:
             slavemaster = target["rab"][1]
-            sid = profiles[str(slavemaster)]['discord']['user_id']
+            sprof = await load_profile(slavemaster)
+            sid = sprof['discord']['user_id']
             if sid:
                 embed.description += f'Раб {self.bot.get_user(sid).display_name}\n\n'
             else:
@@ -82,7 +74,8 @@ class Neons(commands.Cog):
             embed.description += 'Владелец Гарема\n\n'
         elif target['harem']['is_owned']:
             owner = target['harem']['owner']
-            sid = profiles[str(owner)]['discord']['user_id']
+            oprof = await load_profile(owner)
+            sid = oprof['discord']['user_id']
             if sid:
                 embed.description += f'В гареме у {self.bot.get_user(sid).display_name}\n\n'
             else:
