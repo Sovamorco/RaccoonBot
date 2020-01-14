@@ -20,10 +20,12 @@ class Neons(commands.Cog):
     @commands.check(via_check)
     @commands.command(aliases=['vc'], help='Команда для связи аккаунта вк с аккаунтом дискорда', usage='{}[vk_connect|vc]')
     async def vk_connect(self, ctx):
+        integ = json.load(open('resources/integrations.json', 'r'))
+        if str(ctx.author.id) in integ.keys():
+            return await ctx.send('Профиль VIA уже привязан')
         profiles = await load_profiles()
         for user in profiles:
             if profiles[user]['discord']['user_name'].lower() == str(ctx.author).lower():
-                integ = json.load(open('resources/integrations.json', 'r'))
                 profiles[user]['discord']['user_name'] = str(ctx.author)
                 profiles[user]['discord']['user_id'] = ctx.author.id
                 profiles[user]['discord']['confirmed'] = True
