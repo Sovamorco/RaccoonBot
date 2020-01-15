@@ -58,7 +58,7 @@ class Neons(commands.Cog):
         if str(user.id) not in integ.keys():
             return await ctx.send('Профиль VIA не привязан')
         embed = discord.Embed(title='Профиль VIA', description='', color=discord.Color.dark_purple())
-        target = await load_profile(integ[str(ctx.author.id)])
+        target = await load_profile(integ[str(user.id)])
         embed.description += f'Неонов - {target["neons"]}\n\n'
         embed.description += f'Осколков - {target["oskolki"]}\n\n'
 
