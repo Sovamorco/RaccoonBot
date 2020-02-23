@@ -1,6 +1,5 @@
 from discord import Color
 import aiomysql
-from json import loads, dumps
 from credentials import dev, SQLHost, SQLUser, SQLPass
 
 host = SQLHost if dev else '127.0.0.1'
@@ -42,40 +41,40 @@ def get_color(track):
     return Color.greyple()
 
 
-async def load_profiles():
+async def abstract_fetch(fetch_all, table, keys=None, keys_values=None, fields=None):
+    if not fields:
+        fields = '*'
+    else:
+        fields = f'({", ".join(fields)})'
+    table = f'`{table}`'
+    if keys:
+        keys = ', '.join([f'{key}=%s' for key in keys])
+        statement = (f"SELECT {fields} FROM {table} WHERE {keys}", keys_values)
+    else:
+        statement = (f'SELECT {fields} FROM {table}', )
     pool = await aiomysql.create_pool(**config)
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
-            await cur.execute("SELECT `user_id`, `profile` FROM `profiles`")
-            profiles = await cur.fetchall()
+            await cur.execute(*statement)
+            if fetch_all:
+                r = await cur.fetchall()
+            else:
+                r = await cur.fetchone()
     pool.close()
     await pool.wait_closed()
-    new_profiles = {}
-    for profile in profiles:
-        new_profiles[profile[0]] = loads(profile[1])
-    return new_profiles
+    if r is None:
+        return []
+    r = list(r)
+    if len(r) == 1:
+        return r[0]
+    return r
 
 
-async def load_profile(uid):
+async def confirm(uid, username, userid):
     pool = await aiomysql.create_pool(**config)
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
-            await cur.execute("SELECT `profile` FROM `profiles` WHERE `user_id`=%s", [uid])
-            try:
-                (r,) = await cur.fetchone()
-            except TypeError:
-                r = None
-    pool.close()
-    await pool.wait_closed()
-    result = loads(r) if r else None
-    return result
-
-
-async def dump_profile(uid, profile):
-    pool = await aiomysql.create_pool(**config)
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            profile = dumps(profile, ensure_ascii=False)
-            await cur.execute("INSERT INTO `profiles` (user_id, profile) VALUES (%s, %s) ON DUPLICATE KEY UPDATE profile=%s", [uid, profile, profile])
+            await cur.execute("INSERT INTO `via_profiles` (user_id, discord_confirmed, discord_name, discord_id) VALUES (%s, 1, %s, %s)"
+                              " ON DUPLICATE KEY UPDATE discord_confirmed=1, discord_name=%s, discord_id=%s", [uid] + [username, userid]*2)
     pool.close()
     await pool.wait_closed()
