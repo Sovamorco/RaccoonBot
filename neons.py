@@ -1,10 +1,6 @@
 from utils import *
 from discord.ext import commands
-from discord import User
-import json
-from credentials import discord_via_id, vkRaccoonBotKey
-from vk_botting.general import vk_request
-import discord
+from credentials import discord_via_id
 
 
 def via_check(ctx):

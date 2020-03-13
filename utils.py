@@ -1,9 +1,9 @@
 from discord import Color
 import aiomysql
-from credentials import dev, SQLHost, SQLUser, SQLPass
+from credentials import dev, SQLHost, SQLUser, SQLPass, SQLPort
 
 host = SQLHost if dev else '127.0.0.1'
-config = {'host': host, 'port': 3306, 'user': SQLUser, 'password': SQLPass, 'db': 'via', 'autocommit': True}
+config = {'host': host, 'port': SQLPort, 'user': SQLUser, 'password': SQLPass, 'db': 'via', 'autocommit': True}
 
 
 def form(num, arr):
