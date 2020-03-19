@@ -184,7 +184,6 @@ class Music(commands.Cog):
 
     @commands.command(aliases=['p'], usage='{}[p|play] <ссылка/название>', help='Команда для проигрывания музыки')
     async def play(self, ctx, *, query: str = ''):
-        return await ctx.send('Проигрывание музыки временно отключено (примерно на 24 часа) потому что ютаб гнобит музыкальных ботов')
         player = self.bot.lavalink.players.get(ctx.guild.id)
         pref = await get_prefix(self.bot, ctx.message)
         if not query:
@@ -253,7 +252,6 @@ class Music(commands.Cog):
 
     @commands.command(aliases=['fp'], usage='{}[fp|force] <ссылка/название>', help='Команда для добавления трека в начало очереди')
     async def force(self, ctx, *, query: str = ''):
-        return await ctx.send('Проигрывание музыки временно отключено (примерно на 24 часа) потому что ютаб гнобит музыкальных ботов')
         player = self.bot.lavalink.players.get(ctx.guild.id)
         pref = await get_prefix(self.bot, ctx.message)
         if not query:
