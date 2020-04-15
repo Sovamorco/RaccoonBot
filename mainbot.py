@@ -24,18 +24,21 @@ bot.remove_command('help')
 
 async def change_status():
     while True:
-        if dev:
-            status = 'In Development'
-        else:
-            status = '?help | {}'.format(random.choice(discord_status))
-        activity = discord.Streaming(name=status, url='https://twitch.tv/mrdandycorn')
-        await bot.change_presence(activity=activity)
-        await asyncio.sleep(300)
+        try:
+            if dev:
+                status = 'In Development'
+            else:
+                status = '?help | {}'.format(random.choice(discord_status))
+            activity = discord.Streaming(name=status, url='https://twitch.tv/mrdandycorn')
+            await bot.change_presence(activity=activity)
+        except Exception as e:
+            print(f'Got Exception in change_status: {e}')
+        finally:
+            await asyncio.sleep(300)
 
 
 @bot.event
 async def on_ready():
-    bot.loop.create_task(change_status())
     try:
         misc_setup(bot)
         music_setup(bot)
@@ -127,6 +130,7 @@ async def help_(ctx, request=None):
         await ctx.send('Ошибка: \n {}'.format(e))
 
 
+bot.loop.create_task(change_status())
 if dev:
     bot.run(discord_alpha_token)
 else:
