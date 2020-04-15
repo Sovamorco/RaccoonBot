@@ -39,6 +39,7 @@ async def change_status():
 
 @bot.event
 async def on_ready():
+    bot.loop.create_task(change_status())
     try:
         misc_setup(bot)
         music_setup(bot)
@@ -130,7 +131,6 @@ async def help_(ctx, request=None):
         await ctx.send('Ошибка: \n {}'.format(e))
 
 
-bot.loop.create_task(change_status())
 if dev:
     bot.run(discord_alpha_token)
 else:
