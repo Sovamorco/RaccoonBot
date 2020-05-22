@@ -3,7 +3,7 @@ from google.oauth2 import service_account
 from google.cloud import translate_v3beta1 as translate
 
 import io
-from credentials import googleProjectID
+from credentials import google_project_id
 
 credentials = service_account.Credentials.from_service_account_file('service.json')
 ttsClient = texttospeech.TextToSpeechClient(credentials=credentials)
@@ -12,7 +12,7 @@ translateClient = translate.TranslationServiceClient(credentials=credentials)
 
 async def detect_language(text):
     location = 'global'
-    parent = translateClient.location_path(googleProjectID, location)
+    parent = translateClient.location_path(google_project_id, location)
     response = translateClient.detect_language(parent=parent, content=text)
     lang_code = response.languages[0].language_code
     if lang_code == 'und':
