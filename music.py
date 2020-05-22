@@ -13,7 +13,7 @@ from discord.ext import commands
 from bs4 import BeautifulSoup
 from utils import form, get_prefix, get_color
 from credentials import main_password, discord_pers_id, main_web_addr, gachi_things, genius_token, dev, discord_guild_id,\
-    discord_inter_guild_id, discord_inter_afk_channel_id, discord_dev_guild_id, discord_dev_afk_channel_id, vkMusicKey
+    discord_inter_guild_id, discord_inter_afk_channel_id, discord_dev_guild_id, discord_dev_afk_channel_id, vk_audio_token
 
 vk_album_rx = re.compile(r'https?://(?:www\.)?vk.com/(audios-?[0-9]+\?(?:section=playlists&)?z=audio_playlist-?[0-9]+_[0-9]+|music/album/-?[0-9]+_[0-9]+)')
 vk_pers_rx = re.compile(r'https?://(?:www\.)?vk.com/audios-?[0-9]+')
@@ -109,7 +109,7 @@ class Music(commands.Cog):
             'User-Agent': agent
         }
         params = {
-            'access_token': vkMusicKey,
+            'access_token': vk_audio_token,
             'v': '5.999',
             'owner_id': user,
             'playlist_id': aid
@@ -151,7 +151,7 @@ class Music(commands.Cog):
             'User-Agent': agent
         }
         params = {
-            'access_token': vkMusicKey,
+            'access_token': vk_audio_token,
             'v': '5.999',
             'owner_id': user,
             'need_user': 1

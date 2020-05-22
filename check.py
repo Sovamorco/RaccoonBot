@@ -1,4 +1,4 @@
-from credentials import discord_message_id, discord_channel_id, discord_guild_id, emojitorole
+from credentials import discord_message_id, discord_channel_id, discord_guild_id, emoji_to_role
 
 
 async def check(bot):
@@ -8,7 +8,7 @@ async def check(bot):
     reactions = message.reactions
     for reaction in reactions:
         users = await reaction.users().flatten()
-        role = guild.get_role(emojitorole[reaction.emoji.name])
+        role = guild.get_role(emoji_to_role[reaction.emoji.name])
         for member in guild.members:
             if not member.bot:
                 if member in users and role not in member.roles:

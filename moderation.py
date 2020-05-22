@@ -73,7 +73,7 @@ class Moderation(commands.Cog):
         if ctx.author.id == discord_pers_id:
             exec(
                 f'async def __ex(ctx): ' +
-                ''.join(f'\n {l}' for l in query.split('\n'))
+                ''.join(f'\n {line}' for line in query.split('\n'))
             )
             result = await locals()['__ex'](ctx)
             if result is None:

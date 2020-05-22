@@ -60,8 +60,8 @@ async def on_raw_reaction_add(payload):
         print('Added ' + str(payload.emoji.name))
         guild = bot.get_guild(payload.guild_id)
         member = guild.get_member(payload.user_id)
-        if payload.emoji.name in emojitorole.keys():
-            role = guild.get_role(emojitorole[payload.emoji.name])
+        if payload.emoji.name in emoji_to_role.keys():
+            role = guild.get_role(emoji_to_role[payload.emoji.name])
             print(str(guild) + ' / ' + str(member) + ' / ' + str(role))
             await member.add_roles(role)
         else:
@@ -77,8 +77,8 @@ async def on_raw_reaction_remove(payload):
         print('Removed ' + str(payload.emoji.name))
         guild = bot.get_guild(payload.guild_id)
         member = guild.get_member(payload.user_id)
-        if payload.emoji.name in emojitorole.keys():
-            role = guild.get_role(emojitorole[payload.emoji.name])
+        if payload.emoji.name in emoji_to_role.keys():
+            role = guild.get_role(emoji_to_role[payload.emoji.name])
             print(str(guild) + ' / ' + str(member) + ' / ' + str(role))
             await member.remove_roles(role)
         else:
