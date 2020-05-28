@@ -4,7 +4,10 @@ import random
 import json
 import aiohttp
 import asyncio
+import pickle
+import os
 
+from pathvalidate import validate_filename, ValidationError
 from tts import *
 from time import time
 import discord
@@ -42,7 +45,7 @@ class Music(commands.Cog):
             # noinspection PyUnresolvedReferences
             try:
                 for guild in self.bot.guilds:
-                    player = self.bot.lavalink.players.create(guild.id, 'ru')
+                    player = self.bot.lavalink.player_manager.create(guild.id, 'ru')
                     if str(guild.id) not in saved.keys():
                         saved[str(guild.id)] = {}
                         saved[str(guild.id)]['volume'] = 100
@@ -98,7 +101,7 @@ class Music(commands.Cog):
         await ws.voice_state(str(guild_id), channel_id)
 
     async def vk_album_add(self, url, ctx, force=False):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         album = re.search(r'-?[0-9]+_[0-9]+', url)
         if album:
             album = album.group()
@@ -141,7 +144,7 @@ class Music(commands.Cog):
         return discord.Embed(color=discord.Color.blue(), title='✅Плейлист добавлен', description=f'{playlist["title"]} - {added} {form(added, ["трек", "трека", "треков"])}')
 
     async def vk_pers_add(self, url, ctx, force=False):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         user = re.search(r'-?[0-9]+', url)
         if user:
             user = user.group()
@@ -184,7 +187,7 @@ class Music(commands.Cog):
 
     @commands.command(aliases=['p'], usage='{}[p|play] <ссылка/название>', help='Команда для проигрывания музыки')
     async def play(self, ctx, *, query: str = ''):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         pref = await get_prefix(self.bot, ctx.message)
         if not query:
             if player.paused:
@@ -252,7 +255,7 @@ class Music(commands.Cog):
 
     @commands.command(aliases=['fp'], usage='{}[fp|force] <ссылка/название>', help='Команда для добавления трека в начало очереди')
     async def force(self, ctx, *, query: str = ''):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         pref = await get_prefix(self.bot, ctx.message)
         if not query:
             return await ctx.send(f'Использование: {pref}[fp|force] <ссылка/название>')
@@ -317,7 +320,7 @@ class Music(commands.Cog):
     async def gachibass(self, ctx, amt: int = 1):
         if amt > 100:
             return await ctx.send('Нет')
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         with open('resources/gachi.txt', 'r') as f:
             tracks = json.load(f)
         tracks = random.sample(tracks, amt)
@@ -331,7 +334,7 @@ class Music(commands.Cog):
     @commands.command(help='Зачем', usage='{}why [кол-во]\n(Не используйте, пожалуйста)', hidden=True)
     async def why(self, ctx, amt: int = 1):
         if ctx.guild.id == int(discord_guild_id):
-            player = self.bot.lavalink.players.get(ctx.guild.id)
+            player = self.bot.lavalink.player_manager.get(ctx.guild.id)
             if (int(amt) > 20) and (ctx.author.id != discord_pers_id):
                 return await ctx.send('Нет')
             query = 'why.mp3'
@@ -344,7 +347,7 @@ class Music(commands.Cog):
 
     @commands.command(help='Команда для преобразования текста в голос', usage='{}tts <текст>')
     async def tts(self, ctx, *, text):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         if not text:
             pref = get_prefix(self.bot, ctx.message)
             return await ctx.send(f'Использование: {pref}tts <сообщение>')
@@ -360,7 +363,7 @@ class Music(commands.Cog):
 
     @commands.command(help='Команда для перемотки музыки', usage='{}seek <время в секундах>')
     async def seek(self, ctx, *, seconds: int):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
 
         track_time = player.position + (seconds * 1000)
         await player.seek(track_time)
@@ -369,7 +372,7 @@ class Music(commands.Cog):
 
     @commands.command(help='Команда для пропуска трека', usage='{}skip')
     async def skip(self, ctx):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
 
         if not player.is_playing:
             return await ctx.send('Ничего не играет')
@@ -384,7 +387,7 @@ class Music(commands.Cog):
 
     @commands.command(help='Команда для остановки плеера и очистки очереди', usage='{}stop')
     async def stop(self, ctx):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         player.queue.clear()
         await player.stop()
         await self.connect_to(ctx.guild.id, None)
@@ -392,7 +395,7 @@ class Music(commands.Cog):
 
     @commands.command(help='Команда для очистки очереди плеера', usage='{}clear')
     async def clear(self, ctx):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
 
         if not player.queue:
             return await ctx.send('Очередь пустая')
@@ -403,7 +406,7 @@ class Music(commands.Cog):
     @commands.command(aliases=['n', 'np', 'playing', 'current'], usage='{}[n|np|now|playing|current]',
                       help='Команда для отображения текущего трека')
     async def now(self, ctx):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         if not player.current:
             return await ctx.send('Ничего не играет')
         position = lavalink.utils.format_time(player.position)
@@ -419,7 +422,7 @@ class Music(commands.Cog):
     @commands.command(aliases=['nl', 'npl', 'cl'], usage='{}[nl|npl|cl|currentlyrics]',
                       help='Команда для отображения текста текущего трека')
     async def currentlyrics(self, ctx):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         if not player.current:
             return await ctx.send('Ничего не играет')
         title = player.current.title
@@ -477,7 +480,7 @@ class Music(commands.Cog):
     @commands.command(aliases=['q', 'list'], help='Команда для отображения очереди воспроизведения',
                       usage='{}[q|queue|list]')
     async def queue(self, ctx):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         if not player.queue:
             return await ctx.send('Очередь пустая')
         items_per_page = 10
@@ -592,10 +595,89 @@ class Music(commands.Cog):
             else:
                 await reaction.remove(user)
 
+    @commands.command(usage='{}save <название>', help='Команда для сохранения текущей очереди в плейлист')
+    async def save(self, ctx, *, name=None):
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        if not player.queue and not player.current:
+            return await ctx.send('Очередь пустая')
+        if not name:
+            return await ctx.send('Укажите название для сохраняемого плейлиста')
+        playlists = os.listdir(os.path.join('resources', 'playlists'))
+        playlist_name = f'{ctx.author.id}_{name.lower()}'
+        try:
+            validate_filename(playlist_name)
+        except ValidationError:
+            return await ctx.send('Запрещенные символы в названии плейлиста')
+        if playlist_name in playlists:
+            pref = await get_prefix(self.bot, ctx.message)
+            return await ctx.send(f'Плейлист с таким названием уже существует\nДля удаления плейлиста используйте {pref}delete <название>')
+        if len(name) > 100:
+            return await ctx.send('Слишком длинное название для плейлиста')
+        local_queue = player.queue.copy() if player.queue else []
+        if player.current:
+            local_queue.append(player.current)
+        with open(os.path.join('resources', 'playlists', playlist_name), 'wb+') as queue_file:
+            pickle.dump(local_queue, queue_file)
+        ln = len(local_queue)
+        return await ctx.send(f'Плейлист {name} [{ln} {form(ln, ["трек", "трека", "треков"])}] сохранен')
+
+    @commands.command(usage='{}load <название>', help='Команда для загрузки плейлиста в очередь')
+    async def load(self, ctx, *, name=None):
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        if not name:
+            return await ctx.send('Укажите название для загружаемого плейлиста')
+        playlists = os.listdir(os.path.join('resources', 'playlists'))
+        playlist_name = f'{ctx.author.id}_{name.lower()}'
+        try:
+            validate_filename(playlist_name)
+        except ValidationError:
+            return await ctx.send('Запрещенные символы в названии плейлиста')
+        if playlist_name not in playlists:
+            pref = await get_prefix(self.bot, ctx.message)
+            return await ctx.send(f'Нет плейлиста с таким названием\nДля просмотра своих плейлистов используйте {pref}playlists')
+        with open(os.path.join('resources', 'playlists', playlist_name), 'rb') as queue_file:
+            queue = pickle.load(queue_file)
+        for track in queue:
+            player.add(requester=ctx.author.id, track=track)
+        ln = len(queue)
+        await ctx.send(f'Плейлист {name} [{ln} {form(ln, ["трек", "трека", "треков"])}] добавлен в очередь')
+        if not player.is_playing:
+            await player.play()
+
+    @commands.command(usage='{}delete <название>', help='Команда для удаления сохраненного плейлиста')
+    async def delete(self, ctx, *, name=None):
+        if not name:
+            return await ctx.send('Укажите название для загружаемого плейлиста')
+        playlists = os.listdir(os.path.join('resources', 'playlists'))
+        playlist_name = f'{ctx.author.id}_{name.lower()}'
+        try:
+            validate_filename(playlist_name)
+        except ValidationError:
+            return await ctx.send('Запрещенные символы в названии плейлиста')
+        if playlist_name not in playlists:
+            pref = await get_prefix(self.bot, ctx.message)
+            return await ctx.send(f'Нет плейлиста с таким названием\nДля просмотра своих плейлистов используйте {pref}playlists')
+        os.remove(os.path.join('resources', 'playlists', playlist_name))
+        return await ctx.send(f'Плейлист {name} удален!')
+
+    @commands.command(usage='{}playlists', help='Команда для просмотра списка сохраненных плейлистов')
+    async def playlists(self, ctx):
+        playlists = os.listdir(os.path.join('resources', 'playlists'))
+        personal = []
+        for playlist in playlists:
+            user_id, name = playlist.split('_', 1)
+            if int(user_id) == ctx.author.id:
+                personal.append(name)
+        if not personal:
+            return await ctx.send('У вас нет сохраненных плейлистов!')
+        embed = discord.Embed(color=discord.Color.dark_purple(), title='Сохраненные плейлисты',
+                              description='\n'.join([f'{i+1}. {name}' for i, name in enumerate(personal)]))
+        return await ctx.send(embed=embed)
+
     @commands.command(aliases=['resume'], usage='{}[pause|resume]',
                       help='Команда для приостановки или продолжения поспроизведения воспроизведения')
     async def pause(self, ctx):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет')
         await player.set_pause(not player.paused)
@@ -604,7 +686,7 @@ class Music(commands.Cog):
     @commands.command(aliases=['vol'], help='Команда для изменения громкости плеера',
                       usage='{}[vol|volume] <громкость(1-1000)>')
     async def volume(self, ctx, volume: int = None):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         if not volume:
             return await ctx.send(f'🔈 | {player.volume}%')
         await player.set_volume(volume)
@@ -615,7 +697,7 @@ class Music(commands.Cog):
 
     @commands.command(help='Команда для включения/выключения перемешивания очереди', usage='{}shuffle')
     async def shuffle(self, ctx):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         player.shuffle = not player.shuffle
         shffl = json.load(open('resources/saved.json', 'r'))
         shffl[str(ctx.guild.id)]['shuffle'] = player.shuffle
@@ -624,7 +706,7 @@ class Music(commands.Cog):
 
     @commands.command(help='Команда для перемешивания текущей очереди', aliases=['qs'], usage='{}[qshuffle|qs]')
     async def qshuffle(self, ctx):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         if not player.queue:
             return await ctx.send('Очередь пустая')
         random.shuffle(player.queue)
@@ -633,7 +715,7 @@ class Music(commands.Cog):
     @commands.command(aliases=['loop'], usage='{}[loop/repeat]',
                       help='Команда для включения/выключения зацикливания очереди')
     async def repeat(self, ctx):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет')
         player.repeat = not player.repeat
@@ -641,7 +723,7 @@ class Music(commands.Cog):
 
     @commands.command(help='Команда для удаления трека из очереди', usage='{}remove <индекс>')
     async def remove(self, ctx, index: int):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         if not player.queue:
             return await ctx.send('Очередь пустая')
         if index > len(player.queue) or index < 1:
@@ -653,7 +735,7 @@ class Music(commands.Cog):
     @commands.command(aliases=['dc', 'leave'], help='Команда для отключения бота от голосового канала',
                       usage='{}[dc|disconnect|leave]')
     async def disconnect(self, ctx):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         if not player.is_connected:
             return await ctx.send('Не подключен к голосовому каналу')
         player.queue.clear()
@@ -664,7 +746,7 @@ class Music(commands.Cog):
     @commands.command(aliases=['connect', 'c'], usage='{}[c|connect|join]',
                       help='Команда для подключения бота к голосовому каналу')
     async def join(self, ctx):
-        player = self.bot.lavalink.players.get(ctx.guild.id)
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         if player.channel_id:
             if ctx.author.voice.channel.id == int(player.channel_id):
                 return await ctx.send('Уже подключен к голосовому каналу')
@@ -672,9 +754,9 @@ class Music(commands.Cog):
         await ctx.message.add_reaction('👌')
 
     async def ensure_voice(self, ctx):
-        player = self.bot.lavalink.players.create(ctx.guild.id, endpoint=str(ctx.guild.region))
-        should_connect = ctx.command.name in ('play', 'force', 'join', 'why', 'tts', 'join', 'gachibass', 'move')
-        ignored = ctx.command.name in ['volume', 'shuffle']
+        player = self.bot.lavalink.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
+        should_connect = ctx.command.name in ('play', 'force', 'join', 'why', 'tts', 'join', 'gachibass', 'move', 'load')
+        ignored = ctx.command.name in ['volume', 'shuffle', 'playlists', 'delete']
         if ignored:
             return
         if not ctx.author.voice or not ctx.author.voice.channel:

@@ -17,7 +17,7 @@ import aiohttp
 import datetime
 import locale
 
-locale.setlocale(locale.LC_ALL, 'ru_RU')
+locale.setlocale(locale.LC_ALL, 'ru_RU.utf8')
 
 
 async def shiki_refresh(rt):
