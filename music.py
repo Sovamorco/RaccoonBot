@@ -615,7 +615,7 @@ class Music(commands.Cog):
             return await ctx.send('Слишком длинное название для плейлиста')
         local_queue = player.queue.copy() if player.queue else []
         if player.current:
-            local_queue.append(player.current)
+            local_queue.insert(0, player.current)
         with open(os.path.join('resources', 'playlists', playlist_name), 'wb+') as queue_file:
             pickle.dump(local_queue, queue_file)
         ln = len(local_queue)
