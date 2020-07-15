@@ -85,8 +85,7 @@ class Moderation(commands.Cog):
         if ctx.author.id == discord_pers_id:
             activity = discord.Streaming(name='Updating...', url='https://twitch.tv/mrdandycorn')
             await self.bot.change_presence(activity=activity)
-            os.system('bash /home/mrdandycorn/update.sh')
-            os.system('pm2 reload RaccoonBot')
+            os.system('pm2 pull RaccoonBot')
 
     @commands.command(name='shiki_auth', usage='{}shiki_auth', help='Команда для повторной авторизации на шикимори', hidden=True)
     async def shiki_auth_(self, ctx):
