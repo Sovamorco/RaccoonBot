@@ -15,8 +15,7 @@ import lavalink
 from discord.ext import commands
 from bs4 import BeautifulSoup
 from utils import form, get_prefix, get_color
-from credentials import main_password, discord_pers_id, main_web_addr, gachi_things, genius_token, dev, discord_guild_id,\
-    discord_inter_guild_id, discord_inter_afk_channel_id, discord_dev_guild_id, discord_dev_afk_channel_id, vk_audio_token
+from credentials import main_password, discord_pers_id, main_web_addr, gachi_things, genius_token, dev, discord_guild_id, vk_audio_token
 
 vk_album_rx = re.compile(r'https?://(?:www\.)?vk.com/(audios-?[0-9]+\?(?:section=playlists&)?z=audio_playlist-?[0-9]+_[0-9]+|music/album/-?[0-9]+_[0-9]+|music/playlist/-?[0-9]+_[0-9]+)')
 vk_pers_rx = re.compile(r'https?://(?:www\.)?vk.com/audios-?[0-9]+')
@@ -28,8 +27,6 @@ agent = 'KateMobileAndroid/52.1 lite-445 (Android 4.4.2; SDK 19; x86; unknown An
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.afk_guild = discord_dev_guild_id if dev else discord_inter_guild_id
-        self.afk_channel = discord_dev_afk_channel_id if dev else discord_inter_afk_channel_id
 
         if not hasattr(bot, 'lavalink'):
             addr = main_web_addr if dev else '127.0.0.1'
@@ -74,9 +71,6 @@ class Music(commands.Cog):
         if not after.channel and before.channel:
             if any(self.bot.user in channel.members and all(member.bot for member in channel.members) for channel in member.guild.voice_channels):
                 await self.connect_to(member.guild.id, None)
-        if member.guild.id == self.afk_guild and not member.bot:
-            if after.channel and after.channel.id == self.afk_channel and before.channel and before.channel.id != after.channel.id:
-                return await member.send('Вы были перемещены в АФК-канал')
 
     class MusicCommandError(commands.CommandInvokeError):
         pass
