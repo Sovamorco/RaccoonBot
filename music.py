@@ -8,8 +8,6 @@ import pickle
 import os
 
 from pathvalidate import validate_filename, ValidationError
-from tts import *
-from time import time
 import discord
 import lavalink
 from discord.ext import commands
@@ -324,36 +322,6 @@ class Music(commands.Cog):
             await player.play()
         for track in tracks:
             player.add(requester=ctx.author.id, track=track)
-
-    @commands.command(help='Зачем', usage='{}why [кол-во]\n(Не используйте, пожалуйста)', hidden=True)
-    async def why(self, ctx, amt: int = 1):
-        if ctx.guild.id == int(discord_guild_id):
-            player = self.bot.lavalink.player_manager.get(ctx.guild.id)
-            if (int(amt) > 20) and (ctx.author.id != discord_pers_id):
-                return await ctx.send('Нет')
-            query = 'why.mp3'
-            results = await player.node.get_tracks(query)
-            track = results['tracks'][0]
-            for i in range(int(amt)):
-                player.add(requester=ctx.author.id, track=track)
-            if not player.is_playing:
-                await player.play()
-
-    @commands.command(help='Команда для преобразования текста в голос', usage='{}tts <текст>')
-    async def tts(self, ctx, *, text):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
-        if not text:
-            pref = get_prefix(self.bot, ctx.message)
-            return await ctx.send(f'Использование: {pref}tts <сообщение>')
-        ts = time()
-        name = 'output{}.mp3'.format(ts)
-        await create_mp3(text, name)
-        query = 'outputs/'+name
-        results = await player.node.get_tracks(query)
-        track = results['tracks'][0]
-        player.add(requester=ctx.author.id, track=track)
-        if not player.is_playing:
-            await player.play()
 
     @commands.command(help='Команда для перемотки музыки', usage='{}seek <время в секундах>')
     async def seek(self, ctx, *, seconds: int):
@@ -749,7 +717,7 @@ class Music(commands.Cog):
 
     async def ensure_voice(self, ctx):
         player = self.bot.lavalink.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
-        should_connect = ctx.command.name in ('play', 'force', 'join', 'why', 'tts', 'join', 'gachibass', 'move', 'load')
+        should_connect = ctx.command.name in ('play', 'force', 'join', 'join', 'gachibass', 'move', 'load')
         ignored = ctx.command.name in ['volume', 'shuffle', 'playlists', 'delete']
         if ignored:
             return
