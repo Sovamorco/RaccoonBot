@@ -1,4 +1,7 @@
-from discord import Color
+from pymorphy2 import MorphAnalyzer
+from pymorphy2.shapes import restore_capitalization
+
+morph = MorphAnalyzer()
 
 
 def form(num, arr):
@@ -11,26 +14,15 @@ def form(num, arr):
     return arr[1]
 
 
+def sform(num, word):
+    parsed = morph.parse(word)[0]
+    formed = parsed.make_agree_with_number(num).word
+    restored = restore_capitalization(formed, word)
+    return restored
+
+
 async def get_prefix(bot, msg):
     pref = await bot.get_prefix(msg)
     for pr in pref:
         if str(bot.user.id) not in pr:
             return pr
-
-
-def get_color(track):
-    if 'youtube' in track:
-        return Color.red()
-    if 'soundcloud' in track:
-        return Color.orange()
-    if 'twitch' in track:
-        return Color.purple()
-    if 'bandcamp' in track:
-        return Color.blue()
-    if 'vimeo' in track:
-        return Color.dark_blue()
-    if 'mixer' in track or 'beam' in track:
-        return Color.blurple()
-    if 'vkuseraudio' in track:
-        return Color.blue()
-    return Color.greyple()
