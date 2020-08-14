@@ -221,7 +221,7 @@ async def get_spotify_playlist(uri):
         if r['next'] is None:
             break
         r = await spotify.make_spotify_req(r['next'])
-    tracks = [Track(item['track']['artists'][0]['name'], item['track']['name'], show_url=item['track']['external_urls']['spotify']) for item in res]
+    tracks = [Track(item['track']['artists'][0]['name'], item['track']['name'], show_url=item['track']['external_urls']['spotify']) for item in res if not item['is_local']]
     playlist = await spotify.get_playlist(uri)
     return Playlist(playlist['name'], tracks)
 
