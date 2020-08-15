@@ -1,21 +1,21 @@
-from discord.ext import commands
-import discord
+import locale
+import os
+import re
+from asyncio import sleep
+from datetime import datetime
+from html import unescape
+from json import dump
 from json import load
 from random import choice
-from html import unescape
-from credentials import genius_token, shiki_client_id, shiki_client_secret
-from bs4 import BeautifulSoup
-import re
-from utils import get_prefix
-import os
-import time
-import git
-import json
-import asyncio
+from time import time, gmtime, strftime
+
+from aiohttp import ClientSession, ClientProxyConnectionError, ServerTimeoutError
 from aiohttp_socks import ProxyConnector
-import aiohttp
-import datetime
-import locale
+from bs4 import BeautifulSoup
+from credentials import genius_token, shiki_client_id, shiki_client_secret
+from discord import Embed, Color
+from discord.ext.commands import Cog, command, Bot
+from git import Repo
 
 locale.setlocale(locale.LC_ALL, 'ru_RU.utf8')
 
@@ -30,31 +30,26 @@ async def shiki_refresh(rt):
     headers = {
         'User-Agent': 'RaccoonBot'
     }
-    async with aiohttp.ClientSession() as client:
+    async with ClientSession() as client:
         req = await client.post('https://shikimori.one/oauth/token', data=payload, headers=headers)
         req = await req.json()
-    json.dump(req, open('resources/shiki.json', 'w+'))
+    dump(req, open('resources/shiki.json', 'w+'))
 
 
 async def refresh_shiki_token():
     while True:
-        auth = json.load(open('resources/shiki.json', 'r+'))
-        if time.time() - 3800 > auth['created_at'] + auth['expires_in']:
+        auth = load(open('resources/shiki.json', 'r+'))
+        if time() - 3800 > auth['created_at'] + auth['expires_in']:
             await shiki_refresh(auth['refresh_token'])
-        await asyncio.sleep(3600)
+        await sleep(3600)
 
 
-class Misc(commands.Cog):
-    def __init__(self, bot):
+class Misc(Cog):
+    def __init__(self, bot: Bot):
         self.bot = bot
         self.bot.loop.create_task(refresh_shiki_token())
 
-    async def cog_command_error(self, ctx, error):
-        if isinstance(error, commands.CommandInvokeError) and str(error.original):
-            await ctx.send('Ошибка:\n' + str(error.original))
-
-    @commands.command(name='raccoon', aliases=['racc'], help='Команда, которая сделает вашу жизнь лучше',
-                      usage='{}[racc|raccoon]')
+    @command(name='raccoon', aliases=['racc'], help='Команда, которая сделает вашу жизнь лучше')
     async def raccoon_(self, ctx, *, msg=None):
         user = ctx.author
         if msg is None:
@@ -62,29 +57,27 @@ class Misc(commands.Cog):
         with open('resources/raccoons.txt', 'r') as f:
             raccoons = load(f)
             raccoon = choice(raccoons)
-        embed = discord.Embed(color=discord.Color.dark_purple())
+        embed = Embed(color=Color.dark_purple())
         embed.set_image(url=raccoon)
         return await ctx.send(msg, embed=embed)
 
-    @commands.command(name='inspirobot', aliases=['inspire'], help='Команда для генерации "воодушевляющих" картинок',
-                      usage='{}[inspire|inspirobot]')
+    @command(name='inspirobot', aliases=['inspire'], help='Команда для генерации "воодушевляющих" картинок')
     async def inspire_(self, ctx, *, msg=None):
         user = ctx.author
         if msg is None:
             msg = user.mention
         proxy = ProxyConnector.from_url('socks4://180.250.253.155:45123')
-        async with aiohttp.ClientSession(connector=proxy) as client:
+        async with ClientSession(connector=proxy) as client:
             try:
                 image = await client.get('http://inspirobot.me/api?generate=true')
-            except aiohttp.ClientProxyConnectionError:
+            except ClientProxyConnectionError:
                 return await ctx.send('Ошибка подключения к прокси')
             image = await image.text()
-        embed = discord.Embed(color=discord.Color.dark_purple())
+        embed = Embed(color=Color.dark_purple())
         embed.set_image(url=image)
         return await ctx.send(msg, embed=embed)
 
-    @commands.command(name='fact', aliases=['facts'], help='Команда, возвращающая случайные факты',
-                      usage='{}[fact|facts]')
+    @command(name='fact', aliases=['facts'], help='Команда, возвращающая случайные факты')
     async def fact_(self, ctx, *, msg=None):
         user = ctx.author
         if msg is None:
@@ -92,17 +85,16 @@ class Misc(commands.Cog):
         with open('resources/facts.json', 'r') as f:
             facts = load(f)
             fact = choice(facts)
-        embed = discord.Embed(color=discord.Color.dark_purple(), description=fact)
+        embed = Embed(color=Color.dark_purple(), description=fact)
         return await ctx.send(msg, embed=embed)
 
-    @commands.command(name='wikia', aliases=['wiki'], help='Команда для поиска статей на Fandom\nКриво работает, лучше использовать команду fandom',
-                      usage='{}[wikia|wiki] <запрос>')
+    @command(name='wikia', aliases=['wiki'], help='Команда для поиска статей на Fandom\nКриво работает, лучше использовать команду fandom',
+             usage='wikia <запрос>')
     async def wikia_(self, ctx, *, query=None):
         try:
             text_channel = ctx.message.channel
-            pref = await get_prefix(self.bot, ctx.message)
             if query is None:
-                return await ctx.send(f'Использование: {pref}[wikia|wiki] <запрос>')
+                return await ctx.send(f'Использование: {ctx.prefix}[wikia|wiki] <запрос>')
             apiurl = 'https://community.fandom.com/api/v1/Search/CrossWiki'
             user = ctx.message.author
             params = {
@@ -113,7 +105,7 @@ class Misc(commands.Cog):
                 'batch': 1,
                 'rank': 'default'
             }
-            async with aiohttp.ClientSession() as client:
+            async with ClientSession() as client:
                 result = await client.get(apiurl, params=params, timeout=0.5)
                 result = await result.json()
             if 'exception' in result.keys():
@@ -128,18 +120,17 @@ class Misc(commands.Cog):
                         i += 1
                         embedValue += '{}. {}\n'.format(i, result['title'])
                         new_results.append(result)
-            embed = discord.Embed(color=discord.Color.dark_purple(), title='Выберите фэндом', description=embedValue)
+            embed = Embed(color=Color.dark_purple(), title='Выберите фэндом', description=embedValue)
             embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
             choicemsg = await ctx.send(embed=embed)
             canc = False
+            prefixes = await self.bot.get_prefix(ctx.message)
 
             def verify(m):
                 nonlocal canc
                 if m.content.isdigit():
-                    return (0 <= int(m.content) <= len(new_results)) and (m.channel == text_channel) and (
-                            m.author == user)
-                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(
-                    m.content) > 1
+                    return 0 <= int(m.content) <= len(new_results) and m.channel == text_channel and m.author == user
+                canc = m.channel == text_channel and m.author == user and any(m.content.startswith(prefix) and len(m.content) > len(prefix) for prefix in prefixes)
                 return canc
 
             msg = await self.bot.wait_for('message', check=verify, timeout=30)
@@ -161,7 +152,7 @@ class Misc(commands.Cog):
                 'batch': 1
             }
             try:
-                async with aiohttp.ClientSession() as client:
+                async with ClientSession() as client:
                     result = await client.get(apiurl + 'Search/List', params=params, timeout=0.5)
                     result = await result.json()
             except Exception as e:
@@ -176,7 +167,7 @@ class Misc(commands.Cog):
                 'width': 200,
                 'height': 200
             }
-            async with aiohttp.ClientSession() as client:
+            async with ClientSession() as client:
                 result = await client.get(apiurl + 'Articles/Details', params=params, timeout=0.5)
                 result = await result.json()
             basepath = result['basepath']
@@ -206,25 +197,22 @@ class Misc(commands.Cog):
                         'width': int(width),
                         'height': int(height)
                     }
-                async with aiohttp.ClientSession() as client:
+                async with ClientSession() as client:
                     result = await client.get(apiurl + 'Articles/Details', params=params, timeout=0.5)
                     result = await result.json()
                 thumb = result['items'][str(page_id)]['thumbnail']
-            embed = discord.Embed(color=discord.Color.dark_purple(), title=title, url=page_url, description=desc)
+            embed = Embed(color=Color.dark_purple(), title=title, url=page_url, description=desc)
             if thumb is not None:
                 embed.set_thumbnail(url=thumb)
             return await ctx.send(user.mention, embed=embed)
-        except aiohttp.ServerTimeoutError:
+        except ServerTimeoutError:
             await ctx.send('Не удалось подключиться к Wikia')
 
-    @commands.command(name='fandom', help='Вторая команда для поиска статей на Fandom',
-                      usage='{}fandom <фэндом>')
-    async def fandom_(self, ctx, *, query=None):
+    @command(name='fandom', help='Вторая команда для поиска статей на Fandom',
+             usage='fandom <фэндом>')
+    async def fandom_(self, ctx, *, query):
         try:
             text_channel = ctx.message.channel
-            pref = await get_prefix(self.bot, ctx.message)
-            if query is None:
-                return await ctx.send(f'Использование: {pref}fandom <фэндом>')
             apiurl = 'https://community.fandom.com/api/v1/Search/CrossWiki'
             user = ctx.message.author
             params = {
@@ -235,7 +223,7 @@ class Misc(commands.Cog):
                 'batch': 1,
                 'rank': 'default'
             }
-            async with aiohttp.ClientSession() as client:
+            async with ClientSession() as client:
                 result = await client.get(apiurl, params=params, timeout=0.5)
                 result = await result.json()
             if 'exception' in result.keys():
@@ -252,7 +240,7 @@ class Misc(commands.Cog):
                         new_results.append(result)
             if len(new_results) < 10:
                 params['lang'] = 'ru'
-                async with aiohttp.ClientSession() as client:
+                async with ClientSession() as client:
                     result = await client.get(apiurl, params=params, timeout=0.5)
                     result = await result.json()
                 if 'exception' in result.keys():
@@ -267,18 +255,17 @@ class Misc(commands.Cog):
                                 i += 1
                                 embedValue += '{}. {}\n'.format(i, result['title'])
                                 new_results.append(result)
-            embed = discord.Embed(color=discord.Color.dark_purple(), title='Выберите фэндом', description=embedValue)
+            embed = Embed(color=Color.dark_purple(), title='Выберите фэндом', description=embedValue)
             embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
             choicemsg = await ctx.send(embed=embed)
             canc = False
+            prefixes = await self.bot.get_prefix(ctx.message)
 
             def verify(m):
                 nonlocal canc
                 if m.content.isdigit():
-                    return (0 <= int(m.content) <= len(new_results)) and (m.channel == text_channel) and (
-                            m.author == user)
-                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(
-                    m.content) > 1
+                    return 0 <= int(m.content) <= len(new_results) and m.channel == text_channel and m.author == user
+                canc = m.channel == text_channel and m.author == user and any(m.content.startswith(prefix) and len(m.content) > len(prefix) for prefix in prefixes)
                 return canc
 
             msg = await self.bot.wait_for('message', check=verify, timeout=30)
@@ -292,16 +279,16 @@ class Misc(commands.Cog):
                 apiurl = '{}api/v1/'.format(result['url'])
             else:
                 apiurl = '{}/api/v1/'.format(result['url'])
-            embed = discord.Embed(color=discord.Color.dark_purple(), title='Введите запрос', description='Отправьте запрос для поска по {}'.format(result['title']))
+            embed = Embed(color=Color.dark_purple(), title='Введите запрос', description='Отправьте запрос для поска по {}'.format(result['title']))
             embed.set_footer(text='Автоматическая отмена через 60 секунд\nОтправьте 0 для отмены')
             choicemsg = await ctx.send(embed=embed)
             canc = False
+            prefixes = await self.bot.get_prefix(ctx.message)
 
             def verify(m):
                 nonlocal canc
-                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(
-                    m.content) > 1
-                return (m.channel == text_channel) and (m.author == user)
+                canc = m.channel == text_channel and m.author == user and any(m.content.startswith(prefix) and len(m.content) > len(prefix) for prefix in prefixes)
+                return m.channel == text_channel and m.author == user
 
             msg = await self.bot.wait_for('message', check=verify, timeout=60)
             if canc:
@@ -315,15 +302,15 @@ class Misc(commands.Cog):
                 'batch': 1
             }
             try:
-                async with aiohttp.ClientSession() as client:
+                async with ClientSession() as client:
                     result = await client.get(apiurl + 'Search/List', params=params, timeout=0.5)
                     result = await result.json()
             except Exception as e:
-                embed = discord.Embed(color=discord.Color.dark_purple(), title='Ошибка', description='Ничего не найдено')
+                embed = Embed(color=Color.dark_purple(), title='Ошибка', description='Ничего не найдено')
                 await choicemsg.edit(embed=embed)
                 return print(e)
             if 'exception' in result.keys() or result['batches'] == 0:
-                embed = discord.Embed(color=discord.Color.dark_purple(), title='Ошибка', description='Ничего не найдено')
+                embed = Embed(color=Color.dark_purple(), title='Ошибка', description='Ничего не найдено')
                 return await choicemsg.edit(embed=embed)
             page_id = result['items'][0]['id']
             params = {
@@ -332,7 +319,7 @@ class Misc(commands.Cog):
                 'width': 200,
                 'height': 200
             }
-            async with aiohttp.ClientSession() as client:
+            async with ClientSession() as client:
                 result = await client.get(apiurl + 'Articles/Details', params=params, timeout=0.5)
                 result = await result.json()
             basepath = result['basepath']
@@ -362,22 +349,19 @@ class Misc(commands.Cog):
                         'width': int(width),
                         'height': int(height)
                     }
-                async with aiohttp.ClientSession() as client:
+                async with ClientSession() as client:
                     result = await client.get(apiurl + 'Articles/Details', params=params, timeout=0.5)
                     result = await result.json()
                 thumb = result['items'][str(page_id)]['thumbnail']
-            embed = discord.Embed(color=discord.Color.dark_purple(), title=title, url=page_url, description=desc)
+            embed = Embed(color=Color.dark_purple(), title=title, url=page_url, description=desc)
             if thumb is not None:
                 embed.set_thumbnail(url=thumb)
             return await choicemsg.edit(content=user.mention, embed=embed)
-        except aiohttp.ServerTimeoutError:
+        except ServerTimeoutError:
             await ctx.send('Не удалось подключиться к Wikia')
 
-    @commands.command(aliases=['l'], usage='{}[l|lyrics] <запрос>', help='Команда для поиска текста песен')
-    async def lyrics(self, ctx, *, title=None):
-        pref = await get_prefix(self.bot, ctx.message)
-        if title is None:
-            return await ctx.send(f'Использование: {pref}[l|lyrics] <запрос>')
+    @command(aliases=['l'], usage='lyrics <запрос>', help='Команда для поиска текста песен')
+    async def lyrics(self, ctx, *, title):
         text_channel = ctx.message.channel
         user = ctx.message.author
         ftitle = re.sub(r'\[([^)]+?)]', '', re.sub(r'\(([^)]+?)\)', '', title.lower()))
@@ -387,7 +371,7 @@ class Misc(commands.Cog):
         headers = {
             'Authorization': 'Bearer ' + genius_token
         }
-        async with aiohttp.ClientSession() as client:
+        async with ClientSession() as client:
             req = await client.get('https://api.genius.com/search', params=params, headers=headers)
             req = await req.json()
         r = req['response']['hits']
@@ -404,18 +388,17 @@ class Misc(commands.Cog):
                                                          result['result']['title'])
                     new_results.append(result)
 
-            embed = discord.Embed(color=discord.Color.dark_purple(), title='Выберите трек', description=embedValue)
+            embed = Embed(color=Color.dark_purple(), title='Выберите трек', description=embedValue)
             embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
             choicemsg = await ctx.send(embed=embed)
             canc = False
+            prefixes = await self.bot.get_prefix(ctx.message)
 
             def verify(m):
                 nonlocal canc
                 if m.content.isdigit():
-                    return (0 <= int(m.content) <= len(new_results)) and (m.channel == text_channel) and (
-                            m.author == user)
-                canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(
-                    m.content) > 1
+                    return 0 <= int(m.content) <= len(new_results) and m.channel == text_channel and m.author == user
+                canc = m.channel == text_channel and m.author == user and any(m.content.startswith(prefix) and len(m.content) > len(prefix) for prefix in prefixes)
                 return canc
 
             msg = await self.bot.wait_for('message', check=verify, timeout=30)
@@ -426,7 +409,7 @@ class Misc(commands.Cog):
             result = new_results[int(msg.content) - 1]
             url = result['result']['url']
             title = '{} - {}'.format(result['result']['primary_artist']['name'], result['result']['title'])
-            async with aiohttp.ClientSession() as client:
+            async with ClientSession() as client:
                 lyrics = await client.get(url)
                 lyrics = await lyrics.text()
             soup = BeautifulSoup(lyrics, 'html.parser')
@@ -438,40 +421,23 @@ class Misc(commands.Cog):
                 for i in range(len(lyrlist)):
                     lyrics += lyrlist[i] + '\n'
                     if i < len(lyrlist) - 1 and len(lyrics + lyrlist[i + 1]) > 2000:
-                        embed = discord.Embed(color=discord.Color.dark_purple(),
-                                              title='Текст {} ({})'.format(title, it), description=lyrics)
+                        embed = Embed(color=Color.dark_purple(),
+                                      title='Текст {} ({})'.format(title, it), description=lyrics)
                         await ctx.send(embed=embed)
                         lyrics = ''
                         it += 1
                     elif i == len(lyrlist) - 1:
-                        embed = discord.Embed(color=discord.Color.dark_purple(),
-                                              title='Текст {} ({})'.format(title, it), description=lyrics)
+                        embed = Embed(color=Color.dark_purple(),
+                                      title='Текст {} ({})'.format(title, it), description=lyrics)
                         return await ctx.send(embed=embed)
             else:
-                embed = discord.Embed(color=discord.Color.dark_purple(),
-                                      title='Текст ' + title, description=lyrics)
+                embed = Embed(color=Color.dark_purple(),
+                              title='Текст ' + title, description=lyrics)
                 return await ctx.send(embed=embed)
 
-    @commands.command(name='link', usage='{}link [канал]', help='Команда для генерации ссылки для создания видеозвонка из голосового канала')
-    async def link_(self, ctx, *, channel=None):
-        if channel is None:
-            if not ctx.author.voice or not ctx.author.voice.channel:
-                return await ctx.send('Сначала подключитесь к голосовому каналу')
-            channel = ctx.author.voice.channel.name
-        channels = await ctx.guild.fetch_channels()
-        for ch in channels:
-            if (ch.__class__ == discord.channel.VoiceChannel) and (ch.name.lower() == channel.lower()):
-                link = 'https://discordapp.com/channels/{}/{}'.format(ctx.guild.id, ch.id)
-                embed = discord.Embed(color=discord.Color.dark_purple(), description='[Магическая ссылка для канала {}]({})'.format(ch.name, link))
-                return await ctx.send(embed=embed)
-        return await ctx.send('Канал с таким именем не найден')
-
-    @commands.command(name='shikimori', aliases=['shiki'], usage='{}shikimori <запрос>', help='Команда для поиска аниме на шикимори')
-    async def shiki_(self, ctx, *, query=''):
-        pref = await get_prefix(self.bot, ctx.message)
-        if not query:
-            return await ctx.send(f'Использование {pref}[shikimori|shiki] <запрос>')
-        auth = json.load(open('resources/shiki.json', 'r'))
+    @command(name='shikimori', aliases=['shiki'], usage='shikimori <запрос>', help='Команда для поиска аниме на шикимори')
+    async def shiki_(self, ctx, *, query):
+        auth = load(open('resources/shiki.json', 'r'))
         at = '{token_type} {access_token}'.format(**auth)
         headers = {
             'User-Agent': 'RaccoonBot',
@@ -482,10 +448,10 @@ class Misc(commands.Cog):
             'search': query,
             'order': 'popularity'
         }
-        async with aiohttp.ClientSession() as client:
+        async with ClientSession() as client:
             results = await client.get('https://shikimori.one/api/animes', headers=headers, params=params)
             results = await results.json()
-        embed = discord.Embed(color=discord.Color.dark_purple())
+        embed = Embed(color=Color.dark_purple())
         if not results:
             embed.description = 'Ничего не найдено'
             return await ctx.send(embed=embed)
@@ -496,12 +462,13 @@ class Misc(commands.Cog):
             embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
             choicemsg = await ctx.send(embed=embed)
             canc = False
+            prefixes = await self.bot.get_prefix(ctx.message)
 
             def verify(m):
                 nonlocal canc
                 if m.content.isdigit():
-                    return (0 <= int(m.content) <= len(results)) and (m.channel == ctx.channel) and (m.author == ctx.author)
-                canc = (m.channel == ctx.channel) and (m.author == ctx.author) and (m.content.startswith(pref)) and len(m.content) > len(pref)
+                    return 0 <= int(m.content) <= len(results) and m.channel == ctx.channel and m.author == ctx.author
+                canc = m.channel == ctx.channel and m.author == ctx.author and any(m.content.startswith(prefix) and len(m.content) > len(prefix) for prefix in prefixes)
                 return canc
 
             msg = await self.bot.wait_for('message', check=verify, timeout=30)
@@ -512,8 +479,8 @@ class Misc(commands.Cog):
         else:
             result = results[0]
         title = result['russian'] if result['russian'] else result['name']
-        embed = discord.Embed(color=discord.Color.dark_purple(), title=title, url='https://shikimori.one' + result['url'])
-        async with aiohttp.ClientSession() as client:
+        embed = Embed(color=Color.dark_purple(), title=title, url='https://shikimori.one' + result['url'])
+        async with ClientSession() as client:
             info = await client.get(f'https://shikimori.one/api/animes/{result["id"]}', headers=headers)
             info = await info.json()
         embed.set_thumbnail(url='https://shikimori.one' + info['image']['original'])
@@ -536,15 +503,15 @@ class Misc(commands.Cog):
             embed.add_field(name='Оценка', value=info['score'], inline=False)
         if info['anons']:
             if info['aired_on']:
-                date = datetime.datetime.strptime(info['aired_on'][:-6], '%Y-%m-%dT%H:%M:%S.%f').strftime('%a, %d %b %Y %H:%M')
+                date = datetime.strptime(info['aired_on'][:-6], '%Y-%m-%dT%H:%M:%S.%f').strftime('%a, %d %b %Y %H:%M')
                 embed.add_field(name='Дата начала показа', value=date, inline=False)
         else:
             if info['released_on'] or info['aired_on']:
                 date = ('Дата окончания показа', info['released_on']) if info['released_on'] and not info['ongoing'] else ('Дата начала показа', info['aired_on'])
-                date = date[0], datetime.datetime.strptime(date[1], '%Y-%m-%d').strftime('%d %b %Y')
+                date = date[0], datetime.strptime(date[1], '%Y-%m-%d').strftime('%d %b %Y')
                 embed.add_field(name=date[0], value=date[1], inline=False)
             if info['next_episode_at']:
-                date = datetime.datetime.strptime(info['next_episode_at'][:-6], '%Y-%m-%dT%H:%M:%S.%f').strftime('%a, %d %b %Y %H:%M')
+                date = datetime.strptime(info['next_episode_at'][:-6], '%Y-%m-%dT%H:%M:%S.%f').strftime('%a, %d %b %Y %H:%M')
                 embed.add_field(name='Дата выхода следующего эпизода', value=date, inline=False)
         if info['description']:
             desc = info['description']
@@ -554,18 +521,18 @@ class Misc(commands.Cog):
             embed.add_field(name='Описание', value=desc, inline=False)
         return await ctx.send(embed=embed)
 
-    @commands.command(name='changelog', usage='{}changelog', help='Команда, показывающая последние обновления бота')
+    @command(name='changelog', help='Команда, показывающая последние обновления бота')
     async def changelog_(self, ctx):
-        repo = git.Repo(os.getcwd())
+        repo = Repo(os.getcwd())
         commits = list(repo.iter_commits('master'))
         cnt = 0
         unique = []
-        embed = discord.Embed(color=discord.Color.dark_purple(), title='Последние изменения', description='')
+        embed = Embed(color=Color.dark_purple(), title='Последние изменения', description='')
         for commit in commits:
             if commit.message not in unique:
                 unique.append(commit.message)
                 cnt += 1
-                embed.description += f'\n{time.strftime("%d-%m-%Y", time.gmtime(commit.authored_date - commit.author_tz_offset))}: {commit.message.strip()}'
+                embed.description += f'\n{strftime("%d-%m-%Y", gmtime(commit.authored_date - commit.author_tz_offset))}: {commit.message.strip()}'
             if cnt == 20:
                 return await ctx.send(embed=embed)
 

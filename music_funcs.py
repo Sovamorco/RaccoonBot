@@ -4,13 +4,14 @@ from time import time
 
 import regex as re
 from aiohttp import ClientSession
-from credentials import vk_audio_token, spotify_client_id, spotify_client_secret
+from credentials import vk_personal_audio_token, spotify_client_id, spotify_client_secret
 from discord import Embed, Color
+from discord.ext.commands import CommandInvokeError
 
 agent = 'KateMobileAndroid/52.1 lite-445 (Android 4.4.2; SDK 19; x86; unknown Android SDK built for x86; en)'
 
-vk_album_rx = re.compile(r'(?:https?://)?(?:www\.)?vk.com/(audios-?[0-9]+\?(?:section=playlists&)?z=audio_playlist-?[0-9]+_[0-9]+|music/album/-?[0-9]+_[0-9]+|music/playlist/-?[0-9]+_[0-9]+)')
-vk_pers_rx = re.compile(r'(?:https?://)?(?:www\.)?vk.com/audios-?[0-9]+')
+vk_album_rx = re.compile(r'(?:audio_playlist|album\/|playlist\/)(-?[0-9]+)_([0-9]+)(?:(?:%2f|%2F|\/|_)([a-z0-9]+))?')
+vk_pers_rx = re.compile(r'audios(-?[0-9]+)')
 spotify_rx = re.compile(r'(?:spotify:|(?:https?:\/\/)?(?:www\.)?open\.spotify\.com\/)(playlist|track|album)(?:\:|\/)([a-zA-Z0-9]+)(.*)$')
 url_rx = re.compile(r'https?://(?:www\.)?.+')
 
@@ -68,21 +69,20 @@ class Playlist:
 
 
 async def get_vk_album(url):
-    album = re.search(r'-?[0-9]+_[0-9]+', url)
-    if album:
-        album = album.group()
-    else:
+    album = vk_album_rx.search(url)
+    if not album:
         return Embed(color=Color.blue(), title='❌Плейлист не найден')
-    user, aid = album.split('_')
     headers = {
         'User-Agent': agent
     }
     params = {
-        'access_token': vk_audio_token,
+        'access_token': vk_personal_audio_token,
         'v': '5.999',
-        'owner_id': user,
-        'playlist_id': aid
+        'owner_id': album.group(1),
+        'playlist_id': album.group(2)
     }
+    if album.group(3):
+        params['access_key'] = album.group(3)
     async with ClientSession() as client:
         res = await client.get('https://api.vk.com/method/audio.get', headers=headers, params=params)
         playlist = await client.get('https://api.vk.com/method/audio.getPlaylistById', headers=headers, params=params)
@@ -98,23 +98,24 @@ async def get_vk_album(url):
             return Embed(color=Color.blue(), title='❌Ошибка при добавлении плейлиста')
     res = res['response']
     playlist = playlist['response']
+    album_url = f'https://vk.com/music/album/{album.group(1)}_{album.group(2)}'
+    if album.group(3):
+        album_url += f'_{album.group(3)}'
     return Playlist(playlist['title'],
-                    [Track(item['artist'], item['title'], item['url'], f'https://vk.com/music/album/{album}') for item in res['items'] if item['url']])
+                    [Track(item['artist'], item['title'], item['url'], album_url) for item in res['items'] if item['url']])
 
 
 async def get_vk_personal(url):
-    user = re.search(r'-?[0-9]+', url)
-    if user:
-        user = user.group()
-    else:
+    user = vk_pers_rx.search(url)
+    if not user:
         return Embed(color=Color.blue(), title='❌Плейлист не найден')
     headers = {
         'User-Agent': agent
     }
     params = {
-        'access_token': vk_audio_token,
+        'access_token': vk_personal_audio_token,
         'v': '5.999',
-        'owner_id': user,
+        'owner_id': user.group(1),
         'need_user': 1
     }
     async with ClientSession() as client:
@@ -128,8 +129,9 @@ async def get_vk_personal(url):
     playlist = res['response']
     items = playlist['items']
     user_info = items.pop(0)
+    audios_url = f'https://vk.com/audios/{user.group(1)}'
     return Playlist(f'Аудиозаписи {user_info["name_gen"]}',
-                    [Track(item['artist'], item['title'], item['url'], f'https://vk.com/audios/{user}') for item in items if item['url']])
+                    [Track(item['artist'], item['title'], item['url'], audios_url) for item in items if item['url']])
 
 
 class Spotify:
@@ -238,13 +240,13 @@ async def get_track(player, query, force_first=False):
             return await get_spotify_album(iden)
         elif typ == 'playlist':
             return await get_spotify_playlist(iden)
-    elif vk_album_rx.match(query):
-        return await get_vk_album(query)
-    elif vk_pers_rx.match(query):
-        return await get_vk_personal(query)
-    is_url = True
-    if not url_rx.match(query):
-        is_url = False
+    is_url = bool(url_rx.match(query))
+    if is_url:
+        if vk_album_rx.search(query):
+            return await get_vk_album(query)
+        elif vk_pers_rx.search(query):
+            return await get_vk_personal(query)
+    else:
         query = f'ytsearch:{query}'
     results = await player.node.get_tracks(query)
     if not results or not results['tracks']:
@@ -277,3 +279,7 @@ def get_embed_color(query):
                 return embed_colors[service]
         return Color.blurple()
     return Color.red()
+
+
+class MusicCommandError(CommandInvokeError):
+    pass

@@ -1,9 +1,9 @@
-import aiohttp
-from discord.ext import commands
-import discord
 from enum import IntFlag
+
+from aiohttp import ClientSession
 from credentials import osu_key
-from utils import get_prefix
+from discord import Embed, Color
+from discord.ext.commands import Cog, command, Bot
 
 
 class osumods(IntFlag):
@@ -41,13 +41,13 @@ class osumods(IntFlag):
     LastMod = 1073741824
 
 
-class Games(commands.Cog):
-    def __init__(self, bot):
+class Games(Cog):
+    def __init__(self, bot: Bot):
         self.bot = bot
         self.cards = {}
 
     async def init(self):
-        async with aiohttp.ClientSession() as client:
+        async with ClientSession() as client:
             try:
                 cards = await client.get('https://sv.bagoum.com/cardsFullJSON')
                 self.cards = await cards.json()
@@ -56,22 +56,15 @@ class Games(commands.Cog):
                 cards = await client.get('https://sv.bagoum.com/cardsFullJSON')
                 self.cards = await cards.json()
 
-    async def cog_command_error(self, ctx, error):
-        if isinstance(error, commands.CommandInvokeError) and str(error.original):
-            await ctx.send('Ошибка:\n' + str(error.original))
-
-    @commands.command(name='osuplayer', aliases=['op'], help='Команда для получения информации о игроке osu!standart',
-                      usage='{}[op|osuplayer] <ник/id>')
-    async def op_(self, ctx, *, nickname=''):
-        if not nickname:
-            pref = await get_prefix(self.bot, ctx.message)
-            return await ctx.send(f'Использование: {pref}[op|osuplayer] <ник/id>')
+    @command(name='osuplayer', aliases=['op'], help='Команда для получения информации о игроке osu!standart',
+             usage='osuplayer <ник/id>')
+    async def op_(self, ctx, *, nickname):
         api_link = 'https://osu.ppy.sh/api/'
         params = {
             'k': osu_key,
             'u': nickname
         }
-        async with aiohttp.ClientSession() as client:
+        async with ClientSession() as client:
             r = await client.get(api_link + 'get_user', params=params, timeout=2)
             r = await r.json()
         if not r:
@@ -79,7 +72,7 @@ class Games(commands.Cog):
         result = r[0]
         if result['playcount'] is None:
             return await ctx.send('Слишком мало информации по пользователю')
-        embed = discord.Embed(color=discord.Color.dark_purple(), title=result['username'], url='https://osu.ppy.sh/users/{}'.format(result['user_id']))
+        embed = Embed(color=Color.dark_purple(), title=result['username'], url='https://osu.ppy.sh/users/{}'.format(result['user_id']))
         embed.set_thumbnail(url='https://a.ppy.sh/{}'.format(result['user_id']))
         embed.add_field(name='Rank', value='{:,}'.format(int(result['pp_rank'])), inline=False)
         embed.add_field(name='Country rank :flag_{}:'.format(result['country'].lower()),
@@ -92,31 +85,28 @@ class Games(commands.Cog):
         embed.add_field(name='Total Score', value='{:,}'.format(int(result['total_score'])), inline=False)
         await ctx.send(ctx.author.mention, embed=embed)
 
-    @commands.command(name='osuplays', aliases=['ops'], usage='{}[ops|osuplays] <ник/id>',
-                      help='Команда для получения информации о лучших плеях игрока osu!standart')
-    async def ops_(self, ctx, *, nickname=''):
-        if not nickname:
-            pref = await get_prefix(self.bot, ctx.message)
-            return await ctx.send(f'Использование: {pref}[ops|osuplays] <ник/id>')
+    @command(name='osuplays', aliases=['ops'], usage='osuplays <ник/id>',
+             help='Команда для получения информации о лучших плеях игрока osu!standart')
+    async def ops_(self, ctx, *, nickname):
         api_link = 'https://osu.ppy.sh/api/'
         params = {
             'k': osu_key,
             'u': nickname
         }
-        async with aiohttp.ClientSession() as client:
+        async with ClientSession() as client:
             plays = await client.get(api_link + 'get_user_best', params=params, timeout=2)
             plays = await plays.json()
         if not plays:
             return await ctx.send('Пользователь не найден')
-        embed = discord.Embed(color=discord.Color.dark_purple(), description='Loading...')
+        embed = Embed(color=Color.dark_purple(), description='Loading...')
         msg = await ctx.send(ctx.author.mention, embed=embed)
-        embed = discord.Embed(color=discord.Color.dark_purple())
+        embed = Embed(color=Color.dark_purple())
         for i in range(len(plays)):
             params = {
                 'k': osu_key,
                 'b': plays[i]['beatmap_id']
             }
-            async with aiohttp.ClientSession() as client:
+            async with ClientSession() as client:
                 info = await client.get(api_link + 'get_beatmaps', params=params)
                 info = await info.json()
                 info = info[0]
@@ -137,85 +127,12 @@ class Games(commands.Cog):
             embed.add_field(name=name, value=value, inline=False)
         await msg.edit(content=ctx.author.mention, embed=embed)
 
-    @commands.command(name='svcard', help='Команда для поиска карты из Shadowverse', usage='{}svcard <запрос>')
-    async def svcard_(self, ctx, *, search=''):
-        pref = await get_prefix(self.bot, ctx.message)
-        if not search:
-            return await ctx.send(f'Использование: {pref}svcard <запрос>')
+    @command(name='svcard', help='Команда для поиска карты из Shadowverse', usage='svcard <запрос>')
+    async def svcard_(self, ctx, *, search):
         cards = self.cards
         results = []
-        if cards.__class__ != dict:
-            return await ctx.send(f'Не удалось получить список карт. Попробуйте использовать {pref}svupdate')
-        text_channel = ctx.message.channel
-        user = ctx.message.author
-        terms = search.split(' ')
-        for card in cards:
-            if all(term.lower() in cards[card]['searchableText'].lower() for term in terms):
-                results.append(cards[card])
-                if len(results) == 10:
-                    break
-        if not results:
-            return await ctx.send('Карты не найдены')
-        else:
-            if len(results) == 1:
-                result = results[0]
-            else:
-                content = ''
-                for i in range(len(results)):
-                    content += '{}. {}\n'.format(i+1, results[i]['name'])
-                embed = discord.Embed(color=discord.Color.dark_purple(), title='Выберите карту', description=content)
-                embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
-                choice = await ctx.send(embed=embed)
-                canc = False
-
-                def verify(m):
-                    nonlocal canc
-                    if m.content.isdigit():
-                        return (0 <= int(m.content) <= len(results)) and (m.channel == text_channel) and (
-                                m.author == user)
-                    canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(
-                        m.content) > 1
-                    return canc
-
-                msg = await self.bot.wait_for('message', check=verify, timeout=30)
-                if canc:
-                    return await choice.delete()
-                if int(msg.content) == 0:
-                    return await choice.delete()
-                result = results[int(msg.content)-1]
-            embed = discord.Embed(color=discord.Color.dark_purple(), title=result['name'], url='https://sv.bagoum.com/cards/{}'.format(result['id']))
-            race = result['faction'] if not result['race'] else '{}/{}'.format(result['faction'], result['race'])
-            embed.set_thumbnail(url='https://sv.bagoum.com/cardF/en/c/{}'.format(result['id']))
-            embed.set_image(url='https://sv.bagoum.com/getRawImage/0/0/{}'.format(result['id']))
-            embed.add_field(name='Класс', value=race, inline=False)
-            embed.add_field(name='Дополнение', value=result['expansion'], inline=False)
-            if result['baseData']['description']:
-                embed.add_field(name='Описание', value=result['baseData']['description'].replace('<br>', '\n'), inline=False)
-            embed.add_field(name='Flair', value=result['baseData']['flair'].replace('<br>', '\n'), inline=False)
-            if result['hasEvo']:
-                evoembed = discord.Embed(color=discord.Color.dark_purple(), title=result['name']+' (evolved)',
-                                         url='https://sv.bagoum.com/cards/{}'.format(result['id']))
-                evoembed.set_thumbnail(url='https://sv.bagoum.com/cardF/en/e/{}'.format(result['id']))
-                evoembed.set_image(url='https://sv.bagoum.com/getRawImage/1/0/{}'.format(result['id']))
-                if result['evoData']['description']:
-                    evoembed.add_field(name='Описание', value=result['evoData']['description'].replace('<br>', '\n'), inline=False)
-                elif result['baseData']['description']:
-                    evoembed.add_field(name='Описание', value=result['baseData']['description'].replace('<br>', '\n'), inline=False)
-                evoembed.add_field(name='Flair', value=result['evoData']['flair'].replace('<br>', '\n'), inline=False)
-                await ctx.send(embed=embed)
-                return await ctx.send(embed=evoembed)
-            return await ctx.send(embed=embed)
-
-    @commands.command(name='svart', help='Команда для поиска арта карты из Shadowverse',
-                      usage='{}svart <запрос>')
-    async def svart_(self, ctx, *, search=''):
-        pref = await get_prefix(self.bot, ctx.message)
-        if not search:
-            return await ctx.send(f'Использование: {pref}svcard <запрос>')
-        cards = self.cards
-        results = []
-        if cards.__class__ != dict:
-            return await ctx.send(f'Не удалось получить список карт. Попробуйте использовать {pref}svupdate')
+        if not isinstance(cards, dict):
+            return await ctx.send(f'Не удалось получить список карт. Попробуйте использовать {ctx.prefix}svupdate')
         text_channel = ctx.message.channel
         user = ctx.message.author
         terms = search.split(' ')
@@ -233,17 +150,17 @@ class Games(commands.Cog):
                 content = ''
                 for i in range(len(results)):
                     content += '{}. {}\n'.format(i + 1, results[i]['name'])
-                embed = discord.Embed(color=discord.Color.dark_purple(), title='Выберите карту', description=content)
+                embed = Embed(color=Color.dark_purple(), title='Выберите карту', description=content)
                 embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
                 choice = await ctx.send(embed=embed)
                 canc = False
+                prefixes = await self.bot.get_prefix(ctx.message)
 
                 def verify(m):
                     nonlocal canc
                     if m.content.isdigit():
-                        return (0 <= int(m.content) <= len(results)) and (m.channel == text_channel) and (
-                                    m.author == user)
-                    canc = (m.channel == text_channel) and (m.author == user) and (m.content.startswith(pref)) and len(m.content) > 1
+                        return 0 <= int(m.content) <= len(results) and m.channel == text_channel and m.author == user
+                    canc = m.channel == text_channel and m.author == user and any(m.content.startswith(prefix) and len(m.content) > len(prefix) for prefix in prefixes)
                     return canc
 
                 msg = await self.bot.wait_for('message', check=verify, timeout=30)
@@ -252,21 +169,86 @@ class Games(commands.Cog):
                 if int(msg.content) == 0:
                     return await choice.delete()
                 result = results[int(msg.content) - 1]
-            embed = discord.Embed(color=discord.Color.dark_purple(), title=result['name'], url='https://sv.bagoum.com/cards/{}'.format(result['id']))
+            embed = Embed(color=Color.dark_purple(), title=result['name'], url='https://sv.bagoum.com/cards/{}'.format(result['id']))
+            race = result['faction'] if not result['race'] else '{}/{}'.format(result['faction'], result['race'])
+            embed.set_thumbnail(url='https://sv.bagoum.com/cardF/en/c/{}'.format(result['id']))
+            embed.set_image(url='https://sv.bagoum.com/getRawImage/0/0/{}'.format(result['id']))
+            embed.add_field(name='Класс', value=race, inline=False)
+            embed.add_field(name='Дополнение', value=result['expansion'], inline=False)
+            if result['baseData']['description']:
+                embed.add_field(name='Описание', value=result['baseData']['description'].replace('<br>', '\n'), inline=False)
+            embed.add_field(name='Flair', value=result['baseData']['flair'].replace('<br>', '\n'), inline=False)
+            if result['hasEvo']:
+                evoembed = Embed(color=Color.dark_purple(), title=result['name'] + ' (evolved)',
+                                 url='https://sv.bagoum.com/cards/{}'.format(result['id']))
+                evoembed.set_thumbnail(url='https://sv.bagoum.com/cardF/en/e/{}'.format(result['id']))
+                evoembed.set_image(url='https://sv.bagoum.com/getRawImage/1/0/{}'.format(result['id']))
+                if result['evoData']['description']:
+                    evoembed.add_field(name='Описание', value=result['evoData']['description'].replace('<br>', '\n'), inline=False)
+                elif result['baseData']['description']:
+                    evoembed.add_field(name='Описание', value=result['baseData']['description'].replace('<br>', '\n'), inline=False)
+                evoembed.add_field(name='Flair', value=result['evoData']['flair'].replace('<br>', '\n'), inline=False)
+                await ctx.send(embed=embed)
+                return await ctx.send(embed=evoembed)
+            return await ctx.send(embed=embed)
+
+    @command(name='svart', help='Команда для поиска арта карты из Shadowverse',
+             usage='svart <запрос>')
+    async def svart_(self, ctx, *, search):
+        cards = self.cards
+        results = []
+        if not isinstance(cards, dict):
+            return await ctx.send(f'Не удалось получить список карт. Попробуйте использовать {ctx.prefix}svupdate')
+        text_channel = ctx.message.channel
+        user = ctx.message.author
+        terms = search.split(' ')
+        for card in cards:
+            if all(term.lower() in cards[card]['searchableText'].lower() for term in terms):
+                results.append(cards[card])
+                if len(results) == 10:
+                    break
+        if not results:
+            return await ctx.send('Карты не найдены')
+        else:
+            if len(results) == 1:
+                result = results[0]
+            else:
+                content = ''
+                for i in range(len(results)):
+                    content += '{}. {}\n'.format(i + 1, results[i]['name'])
+                embed = Embed(color=Color.dark_purple(), title='Выберите карту', description=content)
+                embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
+                choice = await ctx.send(embed=embed)
+                canc = False
+                prefixes = await self.bot.get_prefix(ctx.message)
+
+                def verify(m):
+                    nonlocal canc
+                    if m.content.isdigit():
+                        return 0 <= int(m.content) <= len(results) and m.channel == text_channel and m.author == user
+                    canc = m.channel == text_channel and m.author == user and any(m.content.startswith(prefix) and len(m.content) > len(prefix) for prefix in prefixes)
+                    return canc
+
+                msg = await self.bot.wait_for('message', check=verify, timeout=30)
+                if canc:
+                    return await choice.delete()
+                if int(msg.content) == 0:
+                    return await choice.delete()
+                result = results[int(msg.content) - 1]
+            embed = Embed(color=Color.dark_purple(), title=result['name'], url='https://sv.bagoum.com/cards/{}'.format(result['id']))
             embed.set_image(url='https://sv.bagoum.com/getRawImage/0/0/{}'.format(result['id']))
             if result['hasEvo']:
-                evoembed = discord.Embed(color=discord.Color.dark_purple(), title=result['name']+' (evolved)',
-                                         url='https://sv.bagoum.com/cards/{}'.format(result['id']))
+                evoembed = Embed(color=Color.dark_purple(), title=result['name'] + ' (evolved)',
+                                 url='https://sv.bagoum.com/cards/{}'.format(result['id']))
                 evoembed.set_image(url='https://sv.bagoum.com/getRawImage/1/0/{}'.format(result['id']))
                 await ctx.send(embed=embed)
                 return await ctx.send(embed=evoembed)
             return await ctx.send(embed=embed)
 
-    @commands.command(name='svupdate', help='Команда для обновления базы данных карт',
-                      usage='{}svupdate')
+    @command(name='svupdate', help='Команда для обновления базы данных карт')
     async def update_(self, ctx):
         try:
-            async with aiohttp.ClientSession() as client:
+            async with ClientSession() as client:
                 cards = await client.get('https://sv.bagoum.com/cardsFullJSON')
                 self.cards = await cards.json()
             return await ctx.send('База данных карт успешно обновлена')

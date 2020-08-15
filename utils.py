@@ -19,10 +19,3 @@ def sform(num, word):
     formed = parsed.make_agree_with_number(num).word
     restored = restore_capitalization(formed, word)
     return restored
-
-
-async def get_prefix(bot, msg):
-    pref = await bot.get_prefix(msg)
-    for pr in pref:
-        if str(bot.user.id) not in pr:
-            return pr

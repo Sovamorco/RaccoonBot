@@ -1,35 +1,32 @@
-from discord.ext import commands
-import discord
-from utils import form, get_prefix
-import json
-import os
+from json import load, dump
+from os import system
 from time import time
+
+from aiohttp import ClientSession
 from credentials import discord_pers_id, shiki_auth_link, shiki_client_id, shiki_client_secret
-import aiohttp
+from discord import VoiceChannel, Embed, Color, Streaming
+from discord.ext.commands import Cog, command, has_permissions, Bot
+
+from utils import form
 
 
-class Moderation(commands.Cog):
-    def __init__(self, bot):
+class Moderation(Cog):
+    def __init__(self, bot: Bot):
         self.bot = bot
 
-    async def cog_command_error(self, ctx, error):
-        if isinstance(error, commands.CommandInvokeError) and str(error.original):
-            await ctx.send('Ошибка:\n' + str(error.original))
-
-    @commands.command(name='purge', help='Команда для удаления последних сообщений',
-                      usage='{}purge <кол-во>')
-    @commands.has_permissions(manage_messages=True)
+    @command(name='purge', help='Команда для удаления последних сообщений',
+             usage='purge <кол-во>')
+    @has_permissions(manage_messages=True)
     async def purge_(self, ctx, amt: int = 0):
         if amt == 0:
-            pref = await get_prefix(self.bot, ctx.message)
-            return await ctx.send(f'Использование: {pref}purge <кол-во>')
+            return await ctx.send(f'Использование: {ctx.prefix}purge <кол-во>')
         channel = ctx.message.channel
         deleted = await channel.purge(limit=amt + 1, check=lambda msg: True)
         amt = len(deleted) - 1
         return await ctx.send('Удалено {} {}'.format(amt, form(amt, ['сообщение', 'сообщения', 'сообщений'])))
 
-    @commands.command(usage='{}move <название канала>',
-                      help='Команда для перемещения всех из одного канала в другой')
+    @command(usage='move <название канала>',
+             help='Команда для перемещения всех из одного канала в другой')
     async def move(self, ctx, *, channel: str):
         if ctx.author.guild_permissions.move_members:
             if ctx.author.voice is None:
@@ -38,15 +35,15 @@ class Moderation(commands.Cog):
                 return await ctx.send('Уже подключен к голосовому каналу')
             channels = await ctx.guild.fetch_channels()
             for ch in channels:
-                if (ch.__class__ == discord.channel.VoiceChannel) and (ch.name.lower() == channel.lower()):
+                if isinstance(ch, VoiceChannel) and (ch.name.lower() == channel.lower()):
                     members = ctx.author.voice.channel.members
                     for member in members:
                         await member.move_to(ch)
                     return await ctx.send('*⃣ | Перемещен в {}'.format(ch.name))
             return await ctx.send('Канал с таким именем не найден')
 
-    @commands.command(name='prefix', pass_context=True, help='Команда для установки префикса бота', usage='{}prefix [префикс]')
-    @commands.has_permissions(administrator=True)
+    @command(name='prefix', pass_context=True, help='Команда для установки префикса бота', usage='prefix [префикс]')
+    @has_permissions(administrator=True)
     async def pref_(self, ctx, pref=None):
         if not pref:
             prefixes = await self.bot.get_prefix(ctx.message)
@@ -54,21 +51,21 @@ class Moderation(commands.Cog):
             for pr in prefixes:
                 if sid not in pr:
                     return await ctx.send('Текущий префикс: {}'.format(pr))
-        pfxs = json.load(open('resources/prefixes.json', 'r'))
+        pfxs = load(open('resources/prefixes.json', 'r'))
         pfxs[str(ctx.guild.id)] = pref
-        json.dump(pfxs, open('resources/prefixes.json', 'w'))
+        dump(pfxs, open('resources/prefixes.json', 'w'))
         return await ctx.send('Префикс установлен на {}'.format(pref))
 
-    @commands.command(name='ping', pass_context=True, help='Команда для проверки жизнеспособности бота', usage='{}ping')
+    @command(name='ping', pass_context=True, help='Команда для проверки жизнеспособности бота')
     async def ping_(self, ctx):
-        embed = discord.Embed(color=discord.Color.dark_purple(), description='Pong')
+        embed = Embed(color=Color.dark_purple(), description='Pong')
         ts = time()
         msg = await ctx.send(embed=embed)
         tm = (time() - ts) * 1000
         embed.description = '{:.2f}ms'.format(tm)
         return await msg.edit(embed=embed)
 
-    @commands.command(name='exec', pass_context=True, help='Не трогай, она тебя сожрет', hidden=True, usage='{}exec <query>')
+    @command(name='exec', pass_context=True, help='Не трогай, она тебя сожрет', hidden=True, usage='exec <query>')
     async def exec_(self, ctx, *, query):
         if ctx.author.id == discord_pers_id:
             exec(
@@ -80,17 +77,17 @@ class Moderation(commands.Cog):
                 result = ':)'
             return await ctx.send(result)
 
-    @commands.command(name='upd', pass_context=True, help='Не трогай, она тебя сожрет', hidden=True, usage='{}upd')
+    @command(name='upd', pass_context=True, help='Не трогай, она тебя сожрет', hidden=True)
     async def upd_(self, ctx):
         if ctx.author.id == discord_pers_id:
-            activity = discord.Streaming(name='Updating...', url='https://twitch.tv/mrdandycorn')
+            activity = Streaming(name='Updating...', url='https://twitch.tv/mrdandycorn')
             await self.bot.change_presence(activity=activity)
-            os.system('pm2 pull RaccoonBot')
+            system('pm2 pull RaccoonBot')
 
-    @commands.command(name='shiki_auth', usage='{}shiki_auth', help='Команда для повторной авторизации на шикимори', hidden=True)
+    @command(name='shiki_auth', help='Команда для повторной авторизации на шикимори', hidden=True)
     async def shiki_auth_(self, ctx):
         if ctx.author.id == discord_pers_id:
-            embed = discord.Embed(color=discord.Color.dark_purple(), title='Ссылка для авторизации', url=shiki_auth_link)
+            embed = Embed(color=Color.dark_purple(), title='Ссылка для авторизации', url=shiki_auth_link)
             embed.set_footer(text='Отправьте 0 для отмены')
             req = await ctx.send(embed=embed)
 
@@ -112,10 +109,10 @@ class Moderation(commands.Cog):
             headers = {
                 'User-Agent': 'RaccoonBot'
             }
-            async with aiohttp.ClientSession() as client:
+            async with ClientSession() as client:
                 req = await client.post('https://shikimori.one/oauth/token', data=payload, headers=headers)
                 req = await req.json()
-            return json.dump(req, open('resources/shiki.json', 'w+'))
+            return dump(req, open('resources/shiki.json', 'w+'))
 
 
 def mod_setup(bot):

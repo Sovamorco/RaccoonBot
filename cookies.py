@@ -1,9 +1,11 @@
-from utils import form, get_prefix
-from discord.ext import commands
-import discord
 import json
-import asyncio
+from asyncio import sleep
 from random import randrange, randint
+
+from discord import Status, Embed, Color
+from discord.ext.commands import Cog, command, Bot
+
+from utils import form
 
 
 def gen_deck():
@@ -35,14 +37,10 @@ def get_cookies(userid):
     return cookies
 
 
-class Cookies(commands.Cog):
-    def __init__(self, bot):
+class Cookies(Cog):
+    def __init__(self, bot: Bot):
         self.bot = bot
         self.bot.loop.create_task(self.add_cookies())
-
-    async def cog_command_error(self, ctx, error):
-        if isinstance(error, commands.CommandInvokeError) and str(error.original):
-            await ctx.send('Ошибка:\n' + str(error.original))
 
     async def add_cookies(self):
         while True:
@@ -52,7 +50,7 @@ class Cookies(commands.Cog):
             for guild in guilds:
                 members = guild.members
                 for member in members:
-                    if member.status == discord.Status.online and not member.bot:
+                    if member.status == Status.online and not member.bot:
                         voice = False if member.voice is None else True
                         if (str(member.id) not in online.keys()) or voice:
                             online[str(member.id)] = {'nick': member.name, 'voice': voice}
@@ -66,9 +64,9 @@ class Cookies(commands.Cog):
                     cookies[user_id] = {'id': int(user_id), 'name': online[user_id]['nick'],
                                         'cookies': randrange(289, 296)}
             json.dump(cookies, open('resources/cookies.json', 'w'))
-            await asyncio.sleep(300)
+            await sleep(300)
 
-    @commands.Cog.listener()
+    @Cog.listener()
     async def on_member_join(self, member):
         if not member.bot:
             cookies = json.load(open('resources/cookies.json', 'r'))
@@ -76,7 +74,7 @@ class Cookies(commands.Cog):
                 cookies[str(member.id)] = {'id': member.id, 'name': member.name, 'cookies': randrange(289, 296)}
             json.dump(cookies, open('resources/cookies.json', 'w'))
 
-    @commands.Cog.listener()
+    @Cog.listener()
     async def on_message(self, message):
         ctx = await self.bot.get_context(message)
         user = ctx.author
@@ -88,8 +86,7 @@ class Cookies(commands.Cog):
                 cookies[str(user.id)]['cookies'] += randrange(10, 17)
             json.dump(cookies, open('resources/cookies.json', 'w'))
 
-    @commands.command(name='cookies', aliases=['points'], help='Команда для отображения печенек',
-                      usage='{}[cookies|points]')
+    @command(name='cookies', aliases=['points'], help='Команда для отображения печенек')
     async def cookies_(self, ctx):
         user = ctx.author
         cookies = get_cookies(user.id)
@@ -98,13 +95,12 @@ class Cookies(commands.Cog):
         return await ctx.send(
             'У {} {:,} {}'.format(user.mention, cookies, form(cookies, ['печенька', 'печеньки', 'печенек'])))
 
-    @commands.command(name='leaderboard', aliases=['lb'], help='Команда для отображения топа печенек',
-                      usage='{}[lb|leaderboard]')
+    @command(name='leaderboard', aliases=['lb'], help='Команда для отображения топа печенек')
     async def leaderboard_(self, ctx):
         cookies = json.load(open('resources/cookies.json', 'r'))
         cookies = sorted(cookies.items(), key=lambda kv: kv[1]['cookies'], reverse=True)
         length = 10 if len(cookies) > 10 else len(cookies)
-        embed = discord.Embed(color=discord.Color.dark_purple())
+        embed = Embed(color=Color.dark_purple())
         embedValue = ''
         for i in range(length):
             amt = cookies[i][1]['cookies']
@@ -125,12 +121,11 @@ class Cookies(commands.Cog):
         embed.add_field(name='Топ сервера', value=embedValue, inline=False)
         return await ctx.send('{}'.format(ctx.author.mention), embed=embed)
 
-    @commands.command(name='blackjack', aliases=['bj'], help='Команда для игры в Блэкджек\nПравила:\n- Дилер перестает брать на 17',
-                      usage='{}[bj|blackjack] <ставка>')
-    async def bj_(self, ctx, amt: int = 0):
+    @command(name='blackjack', aliases=['bj'], help='Команда для игры в Блэкджек\nПравила:\n- Дилер перестает брать на 17',
+             usage='blackjack <ставка>')
+    async def bj_(self, ctx, amt: int):
         if amt <= 0:
-            pref = await get_prefix(self.bot, ctx.message)
-            return await ctx.send(f'Использование: {pref}[bj|blackjack] <ставка>')
+            return await ctx.send('Ставка должна быть положительным числом')
         user = ctx.author
         cookies = get_cookies(user.id)
         if cookies is None:
@@ -149,7 +144,7 @@ class Cookies(commands.Cog):
         Дилер берет {}
         Дилер выдает вам {}
         Дилер берет в закрытую'''.format(fst[0], snd[0], trd[0])
-        embed = discord.Embed(color=discord.Color.dark_purple(), title='Ход игры', description=embedValue)
+        embed = Embed(color=Color.dark_purple(), title='Ход игры', description=embedValue)
         msg = await ctx.send(embed=embed)
         if sum(split[0]) == 21:
             add(user.id, amt * 2)
@@ -180,14 +175,14 @@ class Cookies(commands.Cog):
             response = await self.bot.wait_for('message', check=versplit, timeout=300)
             if response.content.lower() == 'да':
                 split = ([hand[0]], [hand[1]])
-                add(user.id, -1*amt)
+                add(user.id, -1 * amt)
                 spamt = [amt] * 2
         num = 0
         snum = ''
         for hand in split:
             if len(split) == 2:
                 num += 1
-                snum = ' '+str(num)
+                snum = ' ' + str(num)
             while True:
                 embed.description += '''
                 
@@ -218,10 +213,10 @@ class Cookies(commands.Cog):
                             await msg.edit(embed=embed)
                             break
                 if response.content.lower() == 'dd':
-                    add(user.id, -1*amt)
+                    add(user.id, -1 * amt)
                     if len(split) == 2:
                         # noinspection PyUnboundLocalVariable
-                        spamt[num-1] *= 2
+                        spamt[num - 1] *= 2
                     else:
                         amt *= 2
                     embed.description += '\n\nВы удвоили ставку'
@@ -277,7 +272,7 @@ class Cookies(commands.Cog):
             if sum(hand) <= 21:
                 if len(split) == 2:
                     embed.description += '\n\nРука {}'.format(num)
-                    amt = spamt[num-1]
+                    amt = spamt[num - 1]
                 if sum(dealer) == sum(hand):
                     add(user.id, amt)
                     cookies = get_cookies(user.id)
@@ -285,7 +280,8 @@ class Cookies(commands.Cog):
                     await msg.edit(embed=embed)
                 if sum(dealer) > sum(hand):
                     cookies = get_cookies(user.id)
-                    embed.description += '\nУ вас меньше очков, чем у дилера\nВы проиграли\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
+                    embed.description += '\nУ вас меньше очков, чем у дилера\nВы проиграли\nТеперь у вас {:,} {}'.format(cookies,
+                                                                                                                         form(cookies, ['печенька', 'печеньки', 'печенек']))
                     await msg.edit(embed=embed)
                 if sum(hand) > sum(dealer):
                     cookies = get_cookies(user.id)
@@ -293,10 +289,6 @@ class Cookies(commands.Cog):
                     cookies = get_cookies(user.id)
                     embed.description += '\nУ вас больше очков, чем у дилера\nВы победили\nТеперь у вас {:,} {}'.format(cookies, form(cookies, ['печенька', 'печеньки', 'печенек']))
                     await msg.edit(embed=embed)
-
-    @commands.command(name='gamble', help='Команда для игры в Рулетку', usage='{}gamble <ставка>', hidden=True)
-    async def gamble_(self, ctx, amt: int = 0):
-        pass
 
 
 def cookies_setup(bot):
