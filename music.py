@@ -398,6 +398,7 @@ class Music(Cog):
         removed = player.queue.pop(index - 1)
         embed = Embed(color=Color.dark_purple(), title='❌Трек удален', description=f'[{removed.title}]({removed.uri})')
         await ctx.send(embed=embed)
+        await update_queues(player)
 
     @command(aliases=['dc', 'leave'], help='Команда для отключения бота от голосового канала')
     async def disconnect(self, ctx):
