@@ -16,7 +16,7 @@ default_prefix = '?'
 
 def prefix(dbot, msg):
     servid = str(msg.guild.id)
-    prefixes = json.load(open('resources/prefixes.json', 'r'))
+    prefixes = load(open('resources/prefixes.json', 'r'))
     pr = 'r?' if dev else prefixes.get(servid, default_prefix)
     return when_mentioned_or(pr)(dbot, msg)
 
@@ -31,13 +31,13 @@ async def change_status():
             if dev:
                 status = 'In Development'
             else:
-                status = '?help | {}'.format(random.choice(discord_status))
+                status = '?help | {}'.format(choice(discord_status))
             activity = Streaming(name=status, url='https://twitch.tv/mrdandycorn')
             await bot.change_presence(activity=activity)
         except Exception as e:
             print(f'Got Exception in change_status: {e}')
         finally:
-            await asyncio.sleep(300)
+            await sleep(300)
 
 
 @bot.event

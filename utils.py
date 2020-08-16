@@ -4,6 +4,11 @@ from pymorphy2.shapes import restore_capitalization
 morph = MorphAnalyzer()
 
 
+broken = {
+    'печенька': ['печенька', 'печеньки', 'печенек']
+}
+
+
 def form(num, arr):
     if 15 > abs(num) % 100 > 10:
         return arr[2]
@@ -15,7 +20,10 @@ def form(num, arr):
 
 
 def sform(num, word):
-    parsed = morph.parse(word)[0]
-    formed = parsed.make_agree_with_number(num).word
+    if word.lower() in broken:
+        formed = form(num, broken[word.lower()])
+    else:
+        parsed = morph.parse(word)[0]
+        formed = parsed.make_agree_with_number(num).word
     restored = restore_capitalization(formed, word)
     return restored

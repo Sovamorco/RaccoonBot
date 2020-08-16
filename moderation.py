@@ -7,7 +7,7 @@ from credentials import discord_pers_id, shiki_auth_link, shiki_client_id, shiki
 from discord import VoiceChannel, Embed, Color, Streaming
 from discord.ext.commands import Cog, command, has_permissions, Bot
 
-from utils import form
+from utils import sform
 
 
 class Moderation(Cog):
@@ -23,7 +23,7 @@ class Moderation(Cog):
         channel = ctx.message.channel
         deleted = await channel.purge(limit=amt + 1, check=lambda msg: True)
         amt = len(deleted) - 1
-        return await ctx.send('Удалено {} {}'.format(amt, form(amt, ['сообщение', 'сообщения', 'сообщений'])))
+        return await ctx.send('Удалено {} {}'.format(amt, sform(amt, 'сообщение')))
 
     @command(usage='move <название канала>',
              help='Команда для перемещения всех из одного канала в другой')

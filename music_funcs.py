@@ -1,5 +1,6 @@
 from asyncio import get_event_loop
 from base64 import b64encode
+from math import ceil
 from time import time
 
 import regex as re
@@ -7,6 +8,9 @@ from aiohttp import ClientSession
 from credentials import vk_personal_audio_token, spotify_client_id, spotify_client_secret
 from discord import Embed, Color
 from discord.ext.commands import CommandInvokeError
+from lavalink import DefaultPlayer
+
+from utils import sform
 
 agent = 'KateMobileAndroid/52.1 lite-445 (Android 4.4.2; SDK 19; x86; unknown Android SDK built for x86; en)'
 
@@ -36,6 +40,8 @@ class Track:
 
     async def get_track(self, player):
         track = await get_track(player, self.uri, True)
+        if not isinstance(track, dict):
+            return
         track['info']['author'] = self.author
         track['info']['title'] = str(self)
         track['info']['uri'] = self.show_url
@@ -62,7 +68,8 @@ class Playlist:
                 player.add(requester=requester, track=track, index=index)
             else:
                 audiotrack = await track.get_track(player)
-                player.add(requester=requester, track=audiotrack, index=index)
+                if audiotrack:
+                    player.add(requester=requester, track=audiotrack, index=index)
             if first:
                 await player.play()
                 first = False
@@ -283,3 +290,131 @@ def get_embed_color(query):
 
 class MusicCommandError(CommandInvokeError):
     pass
+
+
+queues = []
+
+
+class Queue:
+    def __init__(self, player, context, items_per_page=10):
+        self.player = player
+        self.context = context
+        self.message = None
+        self.page = 0
+        self._items_per_page = items_per_page
+
+    async def send(self):
+        self.message = await self.context.send(embed=self.embed)
+        await self.update_emojis()
+
+    @property
+    def pages(self):
+        return ceil(len(self.player.queue) / self._items_per_page)
+
+    @property
+    def color(self):
+        if self.player.current:
+            return get_embed_color(self.player.current.uri)
+        return Color.dark_purple()
+
+    @property
+    def _to_embed_content(self):
+        if self.player.current:
+            result = f'\n**`Сейчас играет: `[`{self.player.current.title}`]({self.player.current.uri})**\n\n\n'
+        else:
+            result = ''
+        for index, track in enumerate(self.player.queue[self.page*10:(self.page+1)*10], start=self.page*10):
+            result += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
+        return result
+
+    @property
+    def embed(self):
+        content = self._to_embed_content
+        embed = Embed(color=self.color, description=f'**{len(self.player.queue)} {sform(len(self.player.queue), "трек")}**\n\n{content}')
+        return embed
+
+    @property
+    def emojis_list(self):
+        result = ['❌']
+        if self.page > 0:
+            result.extend(['⏮', '◀'])
+        if self.page < self.pages - 1:
+            result.extend(['▶', '⏭'])
+        return result
+
+    async def react(self, reaction):
+        emoji = str(reaction)
+        if emoji not in self.emojis_list:
+            return await reaction.clear()
+        elif emoji == '❌':
+            return await self.delete()
+        elif emoji == '⏮':
+            self.page = 0
+        elif emoji == '◀':
+            self.page -= 1
+        elif emoji == '▶':
+            self.page += 1
+        elif emoji == '⏭':
+            self.page = self.pages - 1
+        return await self.update()
+
+    async def update_message(self):
+        self.message = await self.context.fetch_message(self.message.id)
+
+    @property
+    def message_emojis(self):
+        return [str(reaction) for reaction in self.message.reactions]
+
+    async def clear_reactions_but_from_bot(self):
+        await self.update_message()
+        for reaction in self.message.reactions:
+            if reaction.count > 1:
+                async for user in reaction.users():
+                    if user != self.context.bot.user:
+                        await reaction.remove(user)
+
+    async def update_emojis(self):
+        await self.update_message()
+        for emoji in self.message_emojis:
+            if emoji not in self.emojis_list:
+                await self.message.clear_reaction(emoji)
+        for emoji in self.emojis_list:
+            if emoji not in self.message_emojis:
+                await self.message.add_reaction(emoji)
+        await self.clear_reactions_but_from_bot()
+
+    async def delete(self):
+        queues.remove(self)
+        return await self.message.delete()
+
+    async def update(self):
+        if self.pages == 0:
+            return await self.delete()
+        if self.page >= self.pages:
+            self.page = self.pages - 1
+        await self.message.edit(embed=self.embed)
+        await self.update_emojis()
+
+
+async def update_queues(event):
+    if isinstance(event, Player):
+        player = event
+    else:
+        player = event.player
+    for queue in queues:
+        if queue.player == player:
+            await queue.update()
+
+
+class Player(DefaultPlayer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.loop = get_event_loop()
+
+    async def play(self, *args, **kwargs):
+        await super().play(*args, **kwargs)
+        await update_queues(self)
+
+    def add(self, *args, **kwargs):
+        super().add(*args, **kwargs)
+        self.loop.create_task(update_queues(self))

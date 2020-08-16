@@ -1,14 +1,14 @@
 import locale
-import os
-import re
 from asyncio import sleep
 from datetime import datetime
 from html import unescape
 from json import dump
 from json import load
+from os import getcwd
 from random import choice
 from time import time, gmtime, strftime
 
+import regex as re
 from aiohttp import ClientSession, ClientProxyConnectionError, ServerTimeoutError
 from aiohttp_socks import ProxyConnector
 from bs4 import BeautifulSoup
@@ -523,7 +523,7 @@ class Misc(Cog):
 
     @command(name='changelog', help='Команда, показывающая последние обновления бота')
     async def changelog_(self, ctx):
-        repo = Repo(os.getcwd())
+        repo = Repo(getcwd())
         commits = list(repo.iter_commits('master'))
         cnt = 0
         unique = []
