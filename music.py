@@ -430,7 +430,8 @@ class Music(Cog):
         if not player.is_connected:
             if not should_connect:
                 raise MusicCommandError('Я не подключен к каналу')
-            permissions = ctx.author.voice.channel.permissions_for(ctx.me)
+            me = await ctx.guild.fetch_member(ctx.bot.user.id)
+            permissions = ctx.author.voice.channel.permissions_for(me)
             if not permissions.connect or not permissions.speak:
                 raise MusicCommandError('Мне нужны разрешения подключаться к каналу и говорить!')
             player.store('channel', ctx.channel.id)
