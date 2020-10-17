@@ -62,7 +62,6 @@ class Playlist:
         simple = isinstance(self.tracks[0], dict)
         tracks = reversed(self.tracks) if force else self.tracks
         index = 0 if force else None
-        first = True
         for track in tracks:
             if simple:
                 player.add(requester=requester, track=track, index=index)
@@ -70,9 +69,8 @@ class Playlist:
                 audiotrack = await track.get_track(player)
                 if audiotrack:
                     player.add(requester=requester, track=audiotrack, index=index)
-            if first:
+            if not player.is_playing:
                 await player.play()
-                first = False
 
 
 async def get_vk_album(url):
