@@ -52,17 +52,25 @@ class Playlist:
     def __init__(self, title, tracks):
         self.title = title
         self.tracks = tracks
+        self.message_update_frequency = 5
 
     def __str__(self):
         return self.title
 
-    async def add(self, player, requester, force=False):
+    @staticmethod
+    def get_embed(msg, progress, total):
+        old = msg.embeds[0]
+        old.description = f'Загрузка: {progress}/{total}'
+        return old
+
+    async def add(self, player, requester, msg, force=False):
         if not self.tracks:
             return
         simple = isinstance(self.tracks[0], dict)
         tracks = reversed(self.tracks) if force else self.tracks
         index = 0 if force else None
-        for track in tracks:
+        await msg.edit(embed=self.get_embed(msg, 0, len(tracks)))
+        for i, track in enumerate(tracks):
             if simple:
                 player.add(requester=requester, track=track, index=index)
             else:
@@ -71,6 +79,8 @@ class Playlist:
                     player.add(requester=requester, track=audiotrack, index=index)
             if not player.is_playing:
                 await player.play()
+            if (i + 1) % self.message_update_frequency == 0:
+                await msg.edit(embed=self.get_embed(msg, i+1, len(tracks)))
 
 
 async def get_vk_album(url):

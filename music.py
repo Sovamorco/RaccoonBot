@@ -116,7 +116,7 @@ class Music(Cog):
             embed.title = '✅Плейлист добавлен'
             embed.description = f'{res.title} ({len(res.tracks)} {sform(len(res.tracks), "трек")})'
             procmsg = await ctx.send(embed=Embed(title=f'Плейлист "{res}" загружается...', color=color))
-            await res.add(player, ctx.author.id, force)
+            await res.add(player, ctx.author.id, procmsg, force)
             await procmsg.delete()
         elif isinstance(res, list):
             embed_value = ''
