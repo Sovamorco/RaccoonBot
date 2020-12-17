@@ -48,6 +48,12 @@ class Music(Cog):
                 print('Initialized!')
                 break
 
+    async def stop_playing(self, guild_id):
+        player = self.lavalink.player_manager.get(guild_id)
+        player.queue.clear()
+        await player.stop()
+        await self.connect_to(guild_id, None)
+
     @Cog.listener()
     async def on_guild_join(self, guild):
         saved = load(open('resources/saved.json', 'r'))
@@ -60,7 +66,7 @@ class Music(Cog):
     async def on_voice_state_update(self, member, before, after):
         if not after.channel and before.channel:
             if any(self.bot.user in channel.members and all(member.bot for member in channel.members) for channel in member.guild.voice_channels):
-                await self.connect_to(member.guild.id, None)
+                await self.stop_playing(member.guild.id)
 
     @Cog.listener()
     async def on_reaction_add(self, reaction, user):
@@ -191,12 +197,9 @@ class Music(Cog):
             await ctx.send(embed=embed)
         await ctx.message.add_reaction('👌')
 
-    @command(help='Команда для остановки плеера и очистки очереди')
+    @command(aliases=['dc', 'leave', 'disconnect'], help='Команда для остановки плеера и очистки очереди')
     async def stop(self, ctx):
-        player = self.lavalink.player_manager.get(ctx.guild.id)
-        player.queue.clear()
-        await player.stop()
-        await self.connect_to(ctx.guild.id, None)
+        await self.stop_playing(ctx.guild.id)
         await ctx.message.add_reaction('👌')
 
     @command(help='Команда для очистки очереди плеера')
@@ -400,16 +403,6 @@ class Music(Cog):
         await ctx.send(embed=embed)
         await update_queues(player)
 
-    @command(aliases=['dc', 'leave'], help='Команда для отключения бота от голосового канала')
-    async def disconnect(self, ctx):
-        player = self.lavalink.player_manager.get(ctx.guild.id)
-        if not player.is_connected:
-            return await ctx.send('Не подключен к голосовому каналу')
-        player.queue.clear()
-        await player.stop()
-        await self.connect_to(ctx.guild.id, None)
-        await ctx.message.add_reaction('👌')
-
     @command(aliases=['connect', 'c'], help='Команда для подключения бота к голосовому каналу')
     async def join(self, ctx):
         player = self.lavalink.player_manager.get(ctx.guild.id)
@@ -421,8 +414,8 @@ class Music(Cog):
 
     async def ensure_voice(self, ctx):
         player = self.lavalink.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
-        should_connect = ctx.command.name in ('play', 'force', 'join', 'join', 'gachibass', 'move', 'load')
-        ignored = ctx.command.name in ['volume', 'shuffle', 'playlists', 'delete', 'queue', 'now']
+        should_connect = ctx.command.name in ('play', 'force', 'join', 'gachibass', 'move', 'load')
+        ignored = ctx.command.name in ('volume', 'shuffle', 'playlists', 'delete', 'queue', 'now')
         if ignored:
             return
         if not ctx.author.voice or not ctx.author.voice.channel:
