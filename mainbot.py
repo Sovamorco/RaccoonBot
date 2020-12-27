@@ -15,9 +15,9 @@ default_prefix = '?'
 
 
 def prefix(dbot, msg):
-    servid = str(msg.guild.id)
+    destid = str(msg.guild.id) if msg.guild else str(msg.author.id)
     prefixes = load(open('resources/prefixes.json', 'r'))
-    pr = 'r?' if dev else prefixes.get(servid, default_prefix)
+    pr = 'r?' if dev else prefixes.get(destid, default_prefix)
     return when_mentioned_or(pr)(dbot, msg)
 
 
