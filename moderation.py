@@ -3,7 +3,7 @@ from os import system
 from time import time
 
 from aiohttp import ClientSession
-from credentials import discord_pers_id, shiki_auth_link, shiki_client_id, shiki_client_secret
+from credentials import discord_pers_id
 from discord import VoiceChannel, Embed, Color, Streaming
 from discord.ext.commands import Cog, command, has_permissions, Bot
 
@@ -83,36 +83,6 @@ class Moderation(Cog):
             activity = Streaming(name='Updating...', url='https://twitch.tv/mrdandycorn')
             await self.bot.change_presence(activity=activity)
             system('pm2 pull RaccoonBot')
-
-    @command(name='shiki_auth', help='Команда для повторной авторизации на шикимори', hidden=True)
-    async def shiki_auth_(self, ctx):
-        if ctx.author.id == discord_pers_id:
-            embed = Embed(color=Color.dark_purple(), title='Ссылка для авторизации', url=shiki_auth_link)
-            embed.set_footer(text='Отправьте 0 для отмены')
-            req = await ctx.send(embed=embed)
-
-            def verify(m):
-                return m.author.id == discord_pers_id
-
-            msg = await self.bot.wait_for('message', check=verify, timeout=60)
-            await req.delete()
-            if msg.content.isdigit() and int(msg.content) == 0:
-                return
-            code = msg.content
-            payload = {
-                'client_id': shiki_client_id,
-                'client_secret': shiki_client_secret,
-                'code': code,
-                'grant_type': 'authorization_code',
-                'redirect_uri': 'urn:ietf:wg:oauth:2.0:oob'
-            }
-            headers = {
-                'User-Agent': 'RaccoonBot'
-            }
-            async with ClientSession() as client:
-                req = await client.post('https://shikimori.one/oauth/token', data=payload, headers=headers)
-                req = await req.json()
-            return dump(req, open('resources/shiki.json', 'w+'))
 
 
 def mod_setup(bot):
