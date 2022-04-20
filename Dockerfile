@@ -3,8 +3,10 @@ FROM python:3.10-alpine
 COPY requirements.txt .
 RUN python -m pip install -r requirements.txt
 
-RUN mkdir -m 700 /src
-COPY * /src
-WORKDIR /src
+RUN apk add --no-cache git
 
-ENTRYPOINT ["python", "mainbot.py"]
+RUN mkdir -m 700 /src
+COPY * /raccoonbot
+WORKDIR /raccoonbot
+
+ENTRYPOINT ["python", "-u", "mainbot.py"]
