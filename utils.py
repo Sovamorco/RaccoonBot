@@ -1,8 +1,11 @@
+import os
+
 from pymorphy2 import MorphAnalyzer
 from pymorphy2.shapes import restore_capitalization
 
-morph = MorphAnalyzer()
+dev = os.getenv('PRODUCTION') != 'true'
 
+morph = MorphAnalyzer()
 
 broken = {
     'печенька': ['печенька', 'печеньки', 'печенек']

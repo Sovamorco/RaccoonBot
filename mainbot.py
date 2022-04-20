@@ -1,15 +1,14 @@
 from traceback import print_exception
 
-from credentials import discord_status, discord_bot_token, discord_alpha_token
 from discord import ClientException
 from discord.ext.commands import when_mentioned_or, MissingRequiredArgument, BadArgument
 
-from check import *
 from cookies import *
 from games import *
 from misc import *
 from moderation import *
 from music import *
+from utils import dev
 
 default_prefix = '?'
 
@@ -31,8 +30,8 @@ async def change_status():
             if dev:
                 status = 'In Development'
             else:
-                status = '?help | {}'.format(choice(discord_status))
-            activity = Streaming(name=status, url='https://twitch.tv/mrdandycorn')
+                status = '?help | {}'.format(choice(secrets['discord_status']))
+            activity = Streaming(name=status, url='https://twitch.tv/twitch')
             await bot.change_presence(activity=activity)
         except Exception as e:
             print(f'Got Exception in change_status: {e}')
@@ -42,6 +41,10 @@ async def change_status():
 
 @bot.event
 async def on_ready():
+    Path('resources').mkdir(exist_ok=True)
+    prefixes = Path('resources/prefixes.json')
+    if not prefixes.exists():
+        prefixes.write_text('{}')
     bot.loop.create_task(change_status())
     try:
         misc_setup(bot)
@@ -51,50 +54,7 @@ async def on_ready():
         mod_setup(bot)
     except ClientException:
         pass
-    if not dev:
-        await check(bot)
     print('Logged on as', bot.user)
-
-
-@bot.event
-async def on_raw_reaction_add(payload):
-    if payload.message_id == discord_message_id and payload.channel_id == discord_channel_id:
-        print('Added ' + str(payload.emoji.name))
-        guild = bot.get_guild(payload.guild_id)
-        member = guild.get_member(payload.user_id)
-        if payload.emoji.name in emoji_to_role.keys():
-            role = guild.get_role(emoji_to_role[payload.emoji.name])
-            print(str(guild) + ' / ' + str(member) + ' / ' + str(role))
-            await member.add_roles(role)
-        else:
-            channel = guild.get_channel(payload.channel_id)
-            message = await channel.fetch_message(payload.message_id)
-            print(str(guild) + ' / ' + str(member) + ' / ' + str(payload.emoji.name))
-            await message.remove_reaction(payload.emoji, member)
-
-
-@bot.event
-async def on_raw_reaction_remove(payload):
-    if payload.message_id == discord_message_id and payload.channel_id == discord_channel_id:
-        print('Removed ' + str(payload.emoji.name))
-        guild = bot.get_guild(payload.guild_id)
-        member = guild.get_member(payload.user_id)
-        if payload.emoji.name in emoji_to_role.keys():
-            role = guild.get_role(emoji_to_role[payload.emoji.name])
-            print(str(guild) + ' / ' + str(member) + ' / ' + str(role))
-            await member.remove_roles(role)
-        else:
-            pass
-
-
-@bot.command(name='update', pass_context=True, hidden=True)
-async def update(ctx):
-    try:
-        if ctx.author.id == discord_pers_id:
-            await check(bot)
-            await ctx.message.add_reaction('👌')
-    except Exception as e:
-        await ctx.send('Ошибка: \n {}'.format(e))
 
 
 @bot.command(name='help', pass_context=True, help='Команда для вывода этого сообщения', usage='help [команда]')
@@ -143,6 +103,6 @@ async def on_command_error(ctx, error):
 
 
 if dev:
-    bot.run(discord_alpha_token)
+    bot.run(secrets['discord_alpha_token'])
 else:
-    bot.run(discord_bot_token)
+    bot.run(secrets['discord_bot_token'])

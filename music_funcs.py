@@ -5,11 +5,11 @@ from time import time
 
 import regex as re
 from aiohttp import ClientSession
-from credentials import vk_personal_audio_token, spotify_client_id, spotify_client_secret
 from discord import Embed, Color
 from discord.ext.commands import CommandInvokeError
 from lavalink import DefaultPlayer
 
+from credentials import secrets
 from utils import sform
 
 agent = 'KateMobileAndroid/52.1 lite-445 (Android 4.4.2; SDK 19; x86; unknown Android SDK built for x86; en)'
@@ -80,7 +80,7 @@ class Playlist:
             if not player.is_playing:
                 await player.play()
             if (i + 1) % self.message_update_frequency == 0:
-                await msg.edit(embed=self.get_embed(msg, i+1, len(tracks)))
+                await msg.edit(embed=self.get_embed(msg, i + 1, len(tracks)))
 
 
 async def get_vk_album(url):
@@ -91,7 +91,7 @@ async def get_vk_album(url):
         'User-Agent': agent
     }
     params = {
-        'access_token': vk_personal_audio_token,
+        'access_token': secrets['vk_personal_audio_token'],
         'v': '5.999',
         'owner_id': album.group(1),
         'playlist_id': album.group(2)
@@ -128,7 +128,7 @@ async def get_vk_personal(url):
         'User-Agent': agent
     }
     params = {
-        'access_token': vk_personal_audio_token,
+        'access_token': secrets['vk_personal_audio_token'],
         'v': '5.999',
         'owner_id': user.group(1),
         'need_user': 1
@@ -216,7 +216,7 @@ class Spotify:
         return r
 
 
-spotify = Spotify(spotify_client_id, spotify_client_secret)
+spotify = Spotify(secrets['spotify_client_id'], secrets['spotify_client_secret'])
 
 
 async def get_spotify_track(uri):
@@ -331,7 +331,7 @@ class Queue:
             result = f'\n**`Сейчас играет: `[`{self.player.current.title}`]({self.player.current.uri})**\n\n\n'
         else:
             result = ''
-        for index, track in enumerate(self.player.queue[self.page*10:(self.page+1)*10], start=self.page*10):
+        for index, track in enumerate(self.player.queue[self.page * 10:(self.page + 1) * 10], start=self.page * 10):
             result += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
         return result
 

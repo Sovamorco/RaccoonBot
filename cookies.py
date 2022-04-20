@@ -1,5 +1,6 @@
-from json import load, dump
 from asyncio import sleep
+from json import load, dump
+from pathlib import Path
 from random import randrange, randint
 
 from discord import Status, Embed, Color
@@ -39,6 +40,9 @@ def get_cookies(userid):
 
 class Cookies(Cog):
     def __init__(self, bot: Bot):
+        cookies = Path('resources/cookies.json')
+        if not cookies.exists():
+            cookies.write_text('{}')
         self.bot = bot
         self.bot.loop.create_task(self.add_cookies())
 

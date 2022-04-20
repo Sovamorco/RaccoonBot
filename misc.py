@@ -1,21 +1,18 @@
 import locale
-from asyncio import sleep
-from datetime import datetime
 from html import unescape
-from json import dump
 from json import load
 from os import getcwd
 from random import choice
-from time import time, gmtime, strftime
+from time import gmtime, strftime
 
 import regex as re
-from aiohttp import ClientSession, ClientProxyConnectionError, ServerTimeoutError
-from aiohttp_socks import ProxyConnector
+from aiohttp import ClientSession, ServerTimeoutError
 from bs4 import BeautifulSoup
-from credentials import genius_token
 from discord import Embed, Color
 from discord.ext.commands import Cog, command, Bot
 from git import Repo
+
+from credentials import secrets
 
 locale.setlocale(locale.LC_ALL, 'ru_RU.utf8')
 
@@ -34,22 +31,6 @@ class Misc(Cog):
             raccoon = choice(raccoons)
         embed = Embed(color=Color.dark_purple())
         embed.set_image(url=raccoon)
-        return await ctx.send(msg, embed=embed)
-
-    @command(name='inspirobot', aliases=['inspire'], help='Команда для генерации "воодушевляющих" картинок')
-    async def inspire_(self, ctx, *, msg=None):
-        user = ctx.author
-        if msg is None:
-            msg = user.mention
-        proxy = ProxyConnector.from_url('socks4://180.250.253.155:45123')
-        async with ClientSession(connector=proxy) as client:
-            try:
-                image = await client.get('http://inspirobot.me/api?generate=true')
-            except ClientProxyConnectionError:
-                return await ctx.send('Ошибка подключения к прокси')
-            image = await image.text()
-        embed = Embed(color=Color.dark_purple())
-        embed.set_image(url=image)
         return await ctx.send(msg, embed=embed)
 
     @command(name='fact', aliases=['facts'], help='Команда, возвращающая случайные факты')
@@ -344,7 +325,7 @@ class Misc(Cog):
             'q': ftitle
         }
         headers = {
-            'Authorization': 'Bearer ' + genius_token
+            'Authorization': 'Bearer ' + secrets['genius_token']
         }
         async with ClientSession() as client:
             req = await client.get('https://api.genius.com/search', params=params, headers=headers)

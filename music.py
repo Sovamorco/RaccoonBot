@@ -1,27 +1,28 @@
 from asyncio import sleep
 from json import load, dump
 from os import path, listdir, remove
+from pathlib import Path
 from pickle import load as pload, dump as pdump
 from random import sample, choice, shuffle
 from textwrap import wrap
 
 from bs4 import BeautifulSoup
-from credentials import main_password, main_web_addr, gachi_things, genius_token, dev
 from discord.ext.commands import Cog, command, Bot
 from lavalink import Client, NodeException, format_time, add_event_hook, TrackEndEvent
 from pathvalidate import validate_filename, ValidationError
 
 from music_funcs import *
-
-
 # noinspection PyProtectedMember
+from utils import dev
+
+
 class Music(Cog):
     def __init__(self, bot: Bot):
         self.bot = bot
 
-        addr = main_web_addr if dev else '127.0.0.1'
+        addr = secrets['main_web_addr'] if dev else 'lavalink'
         lc = Client(bot.user.id, player=Player)
-        lc.add_node(addr, 2333, main_password, 'ru', 'default-node')
+        lc.add_node(addr, 2333, secrets['main_password'], 'de', 'default-node')
         bot.add_listener(lc.voice_update_handler, 'on_socket_response')
         self.lavalink = lc
 
@@ -29,6 +30,9 @@ class Music(Cog):
         add_event_hook(update_queues, event=TrackEndEvent)
 
     async def initialize(self):
+        saved = Path('resources/saved.json')
+        if not saved.exists():
+            saved.write_text('{}')
         saved = load(open('resources/saved.json', 'r'))
         while True:
             try:
@@ -65,7 +69,7 @@ class Music(Cog):
     @Cog.listener()
     async def on_voice_state_update(self, member, before, after):
         if not after.channel and before.channel:
-            if any(self.bot.user in channel.members and all(member.bot for member in channel.members) for channel in member.guild.voice_channels):
+            if any(self.bot.user in channel.members and all(channel_member.bot for channel_member in channel.members) for channel in member.guild.voice_channels):
                 await self.stop_playing(member.guild.id)
 
     @Cog.listener()
@@ -171,7 +175,7 @@ class Music(Cog):
             tracks = load(f)
         tracks = sample(tracks, amt)
         player.add(requester=ctx.author.id, track=tracks.pop(0))
-        await ctx.send(choice(gachi_things))
+        await ctx.send(choice(secrets['gachi_things']))
         if not player.is_playing:
             await player.play()
         for track in tracks:
@@ -235,7 +239,7 @@ class Music(Cog):
             'q': ftitle
         }
         headers = {
-            'Authorization': 'Bearer ' + genius_token
+            'Authorization': 'Bearer ' + secrets['genius_token']
         }
         async with ClientSession() as client:
             req = await client.get('https://api.genius.com/search', params=params, headers=headers)

@@ -2,11 +2,10 @@ from json import load, dump
 from os import system
 from time import time
 
-from aiohttp import ClientSession
-from credentials import discord_pers_id
 from discord import VoiceChannel, Embed, Color, Streaming
 from discord.ext.commands import Cog, command, has_permissions, Bot
 
+from credentials import secrets
 from utils import sform
 
 
@@ -67,7 +66,7 @@ class Moderation(Cog):
 
     @command(name='exec', pass_context=True, help='Не трогай, она тебя сожрет', hidden=True, usage='exec <query>')
     async def exec_(self, ctx, *, query):
-        if ctx.author.id == discord_pers_id:
+        if ctx.author.id == secrets['discord_pers_id']:
             exec(
                 f'async def __ex(ctx): ' +
                 ''.join(f'\n {line}' for line in query.split('\n'))
@@ -76,13 +75,6 @@ class Moderation(Cog):
             if result is None:
                 result = ':)'
             return await ctx.send(result)
-
-    @command(name='upd', pass_context=True, help='Не трогай, она тебя сожрет', hidden=True)
-    async def upd_(self, ctx):
-        if ctx.author.id == discord_pers_id:
-            activity = Streaming(name='Updating...', url='https://twitch.tv/mrdandycorn')
-            await self.bot.change_presence(activity=activity)
-            system('pm2 pull RaccoonBot')
 
 
 def mod_setup(bot):

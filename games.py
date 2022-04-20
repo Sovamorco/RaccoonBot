@@ -1,9 +1,10 @@
 from enum import IntFlag
 
 from aiohttp import ClientSession
-from credentials import osu_key
 from discord import Embed, Color
 from discord.ext.commands import Cog, command, Bot
+
+from credentials import secrets
 
 
 class osumods(IntFlag):
@@ -61,7 +62,7 @@ class Games(Cog):
     async def op_(self, ctx, *, nickname):
         api_link = 'https://osu.ppy.sh/api/'
         params = {
-            'k': osu_key,
+            'k': secrets['osu_key'],
             'u': nickname
         }
         async with ClientSession() as client:
