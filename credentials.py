@@ -3,7 +3,7 @@ from pathlib import Path
 from hvac import Client
 
 _client = Client(url='https://vault.sovamor.co')
-_creds = Path('vault_creds').read_text().strip().split(':', 1)
+_creds = Path('/run/secrets/raccoonbot_vault').read_text().strip().split(':', 1)
 _client.auth.userpass.login(
     username=_creds[0],
     password=_creds[1],
