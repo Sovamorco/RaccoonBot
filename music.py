@@ -443,5 +443,5 @@ class Music(Cog):
                 raise MusicCommandError('Мы в разных голосовых каналах')
 
 
-def music_setup(bot):
-    bot.add_cog(Music(bot))
+async def music_setup(bot):
+    await bot.add_cog(Music(bot))

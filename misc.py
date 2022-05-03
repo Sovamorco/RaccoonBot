@@ -407,5 +407,5 @@ class Misc(Cog):
                 return await ctx.send(embed=embed)
 
 
-def misc_setup(bot):
-    bot.add_cog(Misc(bot))
+async def misc_setup(bot):
+    await bot.add_cog(Misc(bot))

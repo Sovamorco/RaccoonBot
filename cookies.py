@@ -296,5 +296,5 @@ class Cookies(Cog):
                     await msg.edit(embed=embed)
 
 
-def cookies_setup(bot):
-    bot.add_cog(Cookies(bot))
+async def cookies_setup(bot):
+    await bot.add_cog(Cookies(bot))

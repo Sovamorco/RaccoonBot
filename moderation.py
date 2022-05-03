@@ -75,5 +75,5 @@ class Moderation(Cog):
             return await ctx.send(result)
 
 
-def mod_setup(bot):
-    bot.add_cog(Moderation(bot))
+async def mod_setup(bot):
+    await bot.add_cog(Moderation(bot))

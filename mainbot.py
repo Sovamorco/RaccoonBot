@@ -47,11 +47,11 @@ async def on_ready():
         prefixes.write_text('{}')
     bot.loop.create_task(change_status())
     try:
-        misc_setup(bot)
-        music_setup(bot)
-        cookies_setup(bot)
+        await misc_setup(bot)
+        await music_setup(bot)
+        await cookies_setup(bot)
         await games_setup(bot)
-        mod_setup(bot)
+        await mod_setup(bot)
     except ClientException:
         pass
     print('Logged on as', bot.user)

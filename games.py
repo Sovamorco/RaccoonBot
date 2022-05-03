@@ -260,4 +260,4 @@ class Games(Cog):
 async def games_setup(bot):
     games = Games(bot)
     await games.init()
-    bot.add_cog(games)
+    await bot.add_cog(games)
