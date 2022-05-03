@@ -418,7 +418,7 @@ class Music(Cog):
         await ctx.message.add_reaction('👌')
 
     async def ensure_voice(self, ctx):
-        player = self.lavalink.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
+        player = self.lavalink.player_manager.create(ctx.guild.id)
         should_connect = ctx.command.name in ('play', 'force', 'join', 'gachibass', 'move', 'load')
         ignored = ctx.command.name in ('volume', 'shuffle', 'playlists', 'delete', 'queue', 'now')
         if ignored:
