@@ -1,12 +1,10 @@
 from json import load, dump
-from os import system
 from time import time
 
-from discord import VoiceChannel, Embed, Color, Streaming
+from discord import VoiceChannel, Embed, Color
 from discord.ext.commands import Cog, command, has_permissions, Bot
 
-from credentials import secrets
-from utils import sform
+from utils import sform, secrets
 
 
 class Moderation(Cog):

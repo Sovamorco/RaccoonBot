@@ -12,7 +12,7 @@ from discord import Embed, Color
 from discord.ext.commands import Cog, command, Bot
 from git import Repo
 
-from credentials import secrets
+from utils import secrets
 
 locale.setlocale(locale.LC_ALL, 'ru_RU.utf8')
 

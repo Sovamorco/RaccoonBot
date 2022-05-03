@@ -4,7 +4,7 @@ from aiohttp import ClientSession
 from discord import Embed, Color
 from discord.ext.commands import Cog, command, Bot
 
-from credentials import secrets
+from utils import secrets
 
 
 class osumods(IntFlag):
@@ -91,7 +91,7 @@ class Games(Cog):
     async def ops_(self, ctx, *, nickname):
         api_link = 'https://osu.ppy.sh/api/'
         params = {
-            'k': osu_key,
+            'k': secrets['osu_key'],
             'u': nickname
         }
         async with ClientSession() as client:
@@ -104,7 +104,7 @@ class Games(Cog):
         embed = Embed(color=Color.dark_purple())
         for i in range(len(plays)):
             params = {
-                'k': osu_key,
+                'k': secrets['osu_key'],
                 'b': plays[i]['beatmap_id']
             }
             async with ClientSession() as client:

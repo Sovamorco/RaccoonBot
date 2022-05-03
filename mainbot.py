@@ -1,6 +1,6 @@
 from traceback import print_exception
 
-from discord import ClientException
+from discord import ClientException, Streaming
 from discord.ext.commands import when_mentioned_or, MissingRequiredArgument, BadArgument
 
 from cookies import *

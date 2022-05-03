@@ -12,8 +12,7 @@ from lavalink import Client, NodeException, format_time, add_event_hook, TrackEn
 from pathvalidate import validate_filename, ValidationError
 
 from music_funcs import *
-# noinspection PyProtectedMember
-from utils import dev
+from utils import dev, secrets
 
 
 class Music(Cog):
@@ -80,6 +79,7 @@ class Music(Cog):
                     return await queue.react(reaction)
 
     def cog_unload(self):
+        # noinspection PyProtectedMember
         self.lavalink._event_hooks.clear()
 
     async def cog_before_invoke(self, ctx):
@@ -89,6 +89,7 @@ class Music(Cog):
         return guild_check
 
     async def connect_to(self, guild_id, channel_id):
+        # noinspection PyProtectedMember
         ws = self.bot._connection._get_websocket(guild_id)
         await ws.voice_state(str(guild_id), channel_id)
 
