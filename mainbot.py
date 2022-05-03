@@ -1,6 +1,6 @@
 from traceback import print_exception
 
-from discord import ClientException, Streaming
+from discord import ClientException, Streaming, Intents
 from discord.ext.commands import when_mentioned_or, MissingRequiredArgument, BadArgument
 
 from cookies import *
@@ -20,7 +20,7 @@ def prefix(dbot, msg):
     return when_mentioned_or(pr)(dbot, msg)
 
 
-bot = Bot(command_prefix=prefix, description='Cutest bot on Discord (subjective)', case_insensitive=True)
+bot = Bot(command_prefix=prefix, description='Cutest bot on Discord (subjective)', case_insensitive=True, intents=Intents.default())
 bot.remove_command('help')
 
 
