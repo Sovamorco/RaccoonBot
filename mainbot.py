@@ -20,7 +20,7 @@ def prefix(dbot, msg):
     return when_mentioned_or(pr)(dbot, msg)
 
 
-bot = Bot(command_prefix=prefix, description='Cutest bot on Discord (subjective)', case_insensitive=True, intents=Intents.default())
+bot = Bot(command_prefix=prefix, description='Cutest bot on Discord (subjective)', case_insensitive=True, intents=Intents.all())
 bot.remove_command('help')
 
 
