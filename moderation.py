@@ -4,7 +4,7 @@ from time import time
 from discord import VoiceChannel, Embed, Color
 from discord.ext.commands import Cog, command, has_permissions, Bot
 
-from utils import sform, secrets
+from utils import sform
 
 
 class Moderation(Cog):
@@ -64,7 +64,7 @@ class Moderation(Cog):
 
     @command(name='exec', pass_context=True, help='Не трогай, она тебя сожрет', hidden=True, usage='exec <query>')
     async def exec_(self, ctx, *, query):
-        if ctx.author.id == secrets['discord_pers_id']:
+        if ctx.author.id == self.bot.config['discord']['personal_id']:
             exec(
                 f'async def __ex(ctx): ' +
                 ''.join(f'\n {line}' for line in query.split('\n'))

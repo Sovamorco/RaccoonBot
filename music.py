@@ -13,10 +13,10 @@ from lavalink import Client, NodeException, format_time, add_event_hook, TrackEn
 from pathvalidate import validate_filename, ValidationError
 
 from music_funcs import *
-from utils import dev, secrets
 
 
 class LavalinkVoiceClient(VoiceClient):
+    # noinspection PyMissingConstructor
     def __init__(self, client, channel):
         self.client = client
         self.channel = channel
@@ -40,7 +40,8 @@ class LavalinkVoiceClient(VoiceClient):
         }
         await self.lavalink.voice_update_handler(lavalink_data)
 
-    async def connect(self, *, timeout: float, reconnect: bool, self_deaf: bool = False, self_mute: bool = False) -> None:
+    async def connect(self, *, timeout: float, reconnect: bool, self_deaf: bool = False,
+                      self_mute: bool = False) -> None:
         """
         Connect the bot to the voice channel and create a player_manager
         if it doesn't exist yet.
@@ -76,9 +77,10 @@ class Music(Cog):
         self.bot = bot
 
         if not hasattr(bot, 'lavalink'):
-            addr = secrets['main_web_addr'] if dev else 'lavalink'
             lc = Client(bot.user.id, player=Player)
-            lc.add_node(addr, 2333, secrets['main_password'], 'de', 'default-node')
+            addr = self.bot.config['lavalink']['address']
+            pw = self.bot.config['lavalink']['password']
+            lc.add_node(addr, 2333, pw, 'de', 'default-node')
             self.bot.lavalink = lc
 
             self.bot.loop.create_task(self.initialize())
@@ -126,7 +128,8 @@ class Music(Cog):
     @Cog.listener()
     async def on_voice_state_update(self, member, before, after):
         if not after.channel and before.channel:
-            if any(self.bot.user in channel.members and all(channel_member.bot for channel_member in channel.members) for channel in member.guild.voice_channels):
+            if any(self.bot.user in channel.members and all(channel_member.bot for channel_member in channel.members)
+                   for channel in member.guild.voice_channels):
                 await self.stop_playing(member.guild.id)
 
     @Cog.listener()
@@ -157,7 +160,7 @@ class Music(Cog):
                 return await player.play()
             else:
                 return await ctx.send(f'Использование: {ctx.prefix}[p|play] <ссылка/название>')
-        res = await get_track(player, query)
+        res = await get_track(player, query, self.bot.config)
         if not isinstance(res, (Track, Playlist, dict, list)):
             if isinstance(res, Embed):
                 return await ctx.send(embed=res)
@@ -169,7 +172,7 @@ class Music(Cog):
             embed.description = f'[{res["info"]["title"]}]({res["info"]["uri"]})'
             player.add(requester=ctx.author.id, track=res, index=index)
         elif isinstance(res, Track):
-            track = await res.get_track(player)
+            track = await res.get_track(player, self.bot.config)
             embed.title = '✅Трек добавлен'
             embed.description = f'[{res}]({res.show_url})'
             player.add(requester=ctx.author.id, track=track, index=index)
@@ -180,7 +183,7 @@ class Music(Cog):
             embed.title = '✅Плейлист добавлен'
             embed.description = f'{res.title} ({len(res.tracks)} {sform(len(res.tracks), "трек")})'
             procmsg = await ctx.send(embed=Embed(title=f'Плейлист "{res}" загружается...', color=color))
-            await res.add(player, ctx.author.id, procmsg, force)
+            await res.add(player, ctx.author.id, procmsg, self.bot.config, force)
             await procmsg.delete()
         elif isinstance(res, list):
             embed_value = ''
@@ -195,8 +198,10 @@ class Music(Cog):
             def verify(m):
                 nonlocal canc
                 if m.content.isdigit():
-                    return 0 <= int(m.content) <= min(len(res), 10) and m.channel == ctx.channel and m.author == ctx.author
-                canc = m.channel == ctx.channel and m.author == ctx.author and any(m.content.startswith(prefix) and len(m.content) > len(prefix) for prefix in prefixes)
+                    return 0 <= int(m.content) <= min(len(res),
+                                                      10) and m.channel == ctx.channel and m.author == ctx.author
+                canc = m.channel == ctx.channel and m.author == ctx.author and any(
+                    m.content.startswith(prefix) and len(m.content) > len(prefix) for prefix in prefixes)
                 return canc
 
             msg = await self.bot.wait_for('message', check=verify, timeout=30)
@@ -229,7 +234,7 @@ class Music(Cog):
             tracks = load(f)
         tracks = sample(tracks, amt)
         player.add(requester=ctx.author.id, track=tracks.pop(0))
-        await ctx.send(choice(secrets['gachi_things']))
+        await ctx.send(choice(self.bot.config['gachi_things']))
         if not player.is_playing:
             await player.play()
         for track in tracks:
@@ -251,7 +256,8 @@ class Music(Cog):
         if player.queue or player.current:
             while not player.is_playing:
                 await sleep(0.05)
-            embed = Embed(color=get_embed_color(player.current.uri), title='⏩Дальше', description=f'[{player.current.title}]({player.current.uri})')
+            embed = Embed(color=get_embed_color(player.current.uri), title='⏩Дальше',
+                          description=f'[{player.current.title}]({player.current.uri})')
             await ctx.send(embed=embed)
         await ctx.message.add_reaction('👌')
 
@@ -288,12 +294,13 @@ class Music(Cog):
         if not player.current:
             return await ctx.send('Ничего не играет')
         title = player.current.title
-        ftitle = re.sub(r'(?:\[([^]]+?)]|\(([^)]+?)\)|lyric video|lyrics video|lyrics)', '', title, flags=re.IGNORECASE).strip()
+        ftitle = re.sub(r'(?:\[([^]]+?)]|\(([^)]+?)\)|lyric video|lyrics video|lyrics)', '', title,
+                        flags=re.IGNORECASE).strip()
         params = {
             'q': ftitle
         }
         headers = {
-            'Authorization': 'Bearer ' + secrets['genius_token']
+            'Authorization': 'Bearer ' + self.bot.config['genius_token']
         }
         async with ClientSession() as client:
             req = await client.get('https://api.genius.com/search', params=params, headers=headers)
@@ -345,7 +352,8 @@ class Music(Cog):
         except ValidationError:
             return await ctx.send('Запрещенные символы в названии плейлиста')
         if playlist_name in playlists:
-            return await ctx.send(f'Плейлист с таким названием уже существует\nДля удаления плейлиста используйте {ctx.prefix}delete <название>')
+            return await ctx.send(
+                f'Плейлист с таким названием уже существует\nДля удаления плейлиста используйте {ctx.prefix}delete <название>')
         if len(name) > 100:
             return await ctx.send('Слишком длинное название для плейлиста')
         local_queue = player.queue.copy() if player.queue else []
@@ -366,7 +374,8 @@ class Music(Cog):
         except ValidationError:
             return await ctx.send('Запрещенные символы в названии плейлиста')
         if playlist_name not in playlists:
-            return await ctx.send(f'Нет плейлиста с таким названием\nДля просмотра своих плейлистов используйте {ctx.prefix}playlists')
+            return await ctx.send(
+                f'Нет плейлиста с таким названием\nДля просмотра своих плейлистов используйте {ctx.prefix}playlists')
         with open(path.join('resources', 'playlists', playlist_name), 'rb') as queue_file:
             queue = pload(queue_file)
         for track in queue:
@@ -385,7 +394,8 @@ class Music(Cog):
         except ValidationError:
             return await ctx.send('Запрещенные символы в названии плейлиста')
         if playlist_name not in playlists:
-            return await ctx.send(f'Нет плейлиста с таким названием\nДля просмотра своих плейлистов используйте {ctx.prefix}playlists')
+            return await ctx.send(
+                f'Нет плейлиста с таким названием\nДля просмотра своих плейлистов используйте {ctx.prefix}playlists')
         remove(path.join('resources', 'playlists', playlist_name))
         return await ctx.send(f'Плейлист {name} удален!')
 
@@ -492,4 +502,5 @@ class Music(Cog):
 
 
 async def music_setup(bot):
+    init_spotify(bot.config)
     await bot.add_cog(Music(bot))

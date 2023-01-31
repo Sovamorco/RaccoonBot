@@ -1,0 +1,14 @@
+osu_key: VAULT->raccoonbot/osu_key
+vk_personal_audio_token: VAULT->raccoonbot/vk_personal_audio_token
+
+spotify: VAULT->raccoonbot/spotify
+
+discord:
+  status: VAULT->raccoonbot/discord_status
+  token: VAULT->raccoonbot/token
+  personal_id: VAULT->raccoonbot/personal_id
+
+lavalink: VAULT->raccoonbot/lavalink
+
+genius_token: VAULT->raccoonbot/genius_token
+gachi_things: VAULT->raccoonbot/gachi_things

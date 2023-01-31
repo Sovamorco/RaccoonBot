@@ -1,9 +1,9 @@
-regex==2022.4.24
-aiohttp==3.8.1
-beautifulsoup4==4.11.1
-lavalink==3.1.5
-pathvalidate==2.5.0
-pymorphy2==0.9.1
-GitPython==3.1.27
-git+https://github.com/Sovamorco/common
+regex~=2022.0
+aiohttp~=3.0
+beautifulsoup4~=4.0
+lavalink~=3.0
+pathvalidate~=2.0
+pymorphy2~=0.9.0
+GitPython~=3.0
+git+https://github.com/Sovamorco/common#egg=common[async]
 git+https://github.com/Rapptz/discord.py#egg=discord.py[voice]

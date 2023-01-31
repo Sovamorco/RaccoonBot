@@ -9,7 +9,7 @@ from discord import Embed, Color
 from discord.ext.commands import CommandInvokeError
 from lavalink import DefaultPlayer
 
-from utils import sform, secrets
+from utils import sform
 
 agent = 'KateMobileAndroid/52.1 lite-445 (Android 4.4.2; SDK 19; x86; unknown Android SDK built for x86; en)'
 
@@ -17,6 +17,7 @@ vk_album_rx = re.compile(r'(?:audio_playlist|album\/|playlist\/)(-?[0-9]+)_([0-9
 vk_pers_rx = re.compile(r'audios(-?[0-9]+)')
 spotify_rx = re.compile(r'(?:spotify:|(?:https?:\/\/)?(?:www\.)?open\.spotify\.com\/)(playlist|track|album)(?:\:|\/)([a-zA-Z0-9]+)(.*)$')
 url_rx = re.compile(r'https?://(?:www\.)?.+')
+spotify: 'Spotify' = None
 
 
 class Track:
@@ -37,8 +38,8 @@ class Track:
     def uri(self):
         return self.url or str(self)
 
-    async def get_track(self, player):
-        track = await get_track(player, self.uri, True)
+    async def get_track(self, player, config):
+        track = await get_track(player, self.uri, config, True)
         if not isinstance(track, dict):
             return
         track['info']['author'] = self.author
@@ -62,7 +63,7 @@ class Playlist:
         old.description = f'Загрузка: {progress}/{total}'
         return old
 
-    async def add(self, player, requester, msg, force=False):
+    async def add(self, player, requester, msg, config, force=False):
         if not self.tracks:
             return
         simple = isinstance(self.tracks[0], dict)
@@ -73,7 +74,7 @@ class Playlist:
             if simple:
                 player.add(requester=requester, track=track, index=index)
             else:
-                audiotrack = await track.get_track(player)
+                audiotrack = await track.get_track(player, config)
                 if audiotrack:
                     player.add(requester=requester, track=audiotrack, index=index)
             if not player.is_playing:
@@ -82,7 +83,7 @@ class Playlist:
                 await msg.edit(embed=self.get_embed(msg, i + 1, len(tracks)))
 
 
-async def get_vk_album(url):
+async def get_vk_album(url, config):
     album = vk_album_rx.search(url)
     if not album:
         return Embed(color=Color.blue(), title='❌Плейлист не найден')
@@ -90,7 +91,7 @@ async def get_vk_album(url):
         'User-Agent': agent
     }
     params = {
-        'access_token': secrets['vk_personal_audio_token'],
+        'access_token': config['vk_personal_audio_token'],
         'v': '5.999',
         'owner_id': album.group(1),
         'playlist_id': album.group(2)
@@ -119,7 +120,7 @@ async def get_vk_album(url):
                     [Track(item['artist'], item['title'], item['url'], album_url) for item in res['items'] if item['url']])
 
 
-async def get_vk_personal(url):
+async def get_vk_personal(url, config):
     user = vk_pers_rx.search(url)
     if not user:
         return Embed(color=Color.blue(), title='❌Плейлист не найден')
@@ -127,7 +128,7 @@ async def get_vk_personal(url):
         'User-Agent': agent
     }
     params = {
-        'access_token': secrets['vk_personal_audio_token'],
+        'access_token': config['vk_personal_audio_token'],
         'v': '5.999',
         'owner_id': user.group(1),
         'need_user': 1
@@ -215,9 +216,6 @@ class Spotify:
         return r
 
 
-spotify = Spotify(secrets['spotify_client_id'], secrets['spotify_client_secret'])
-
-
 async def get_spotify_track(uri):
     res = await spotify.get_track(uri)
     return Track(res["artists"][0]["name"], res["name"], show_url=res['external_urls']['spotify'])
@@ -242,7 +240,7 @@ async def get_spotify_playlist(uri):
     return Playlist(playlist['name'], tracks)
 
 
-async def get_track(player, query, force_first=False):
+async def get_track(player, query, config, force_first=False):
     query = query.strip('<>')
     spm = spotify_rx.match(query)
     if spm:
@@ -257,9 +255,9 @@ async def get_track(player, query, force_first=False):
     is_url = bool(url_rx.match(query))
     if is_url:
         if vk_album_rx.search(query):
-            return await get_vk_album(query)
+            return await get_vk_album(query, config)
         elif vk_pers_rx.search(query):
-            return await get_vk_personal(query)
+            return await get_vk_personal(query, config)
     else:
         query = f'ytsearch:{query}'
     results = await player.node.get_tracks(query)
@@ -425,3 +423,8 @@ class Player(DefaultPlayer):
     def add(self, *args, **kwargs):
         super().add(*args, **kwargs)
         self.loop.create_task(update_queues(self))
+
+
+def init_spotify(config):
+    global spotify
+    spotify = Spotify(config['spotify']['client_id'], config['spotify']['client_secret'])

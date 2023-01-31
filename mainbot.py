@@ -1,5 +1,7 @@
+from asyncio import run
 from traceback import print_exception
 
+from common import async_load_config, AsyncVaultClient
 from discord import ClientException, Streaming, Intents
 from discord.ext.commands import when_mentioned_or, MissingRequiredArgument, BadArgument
 
@@ -20,7 +22,8 @@ def prefix(dbot, msg):
     return when_mentioned_or(pr)(dbot, msg)
 
 
-bot = Bot(command_prefix=prefix, description='Cutest bot on Discord (subjective)', case_insensitive=True, intents=Intents.all())
+bot = Bot(command_prefix=prefix, description='Cutest bot on Discord (subjective)', case_insensitive=True,
+          intents=Intents.all())
 bot.remove_command('help')
 
 
@@ -30,7 +33,7 @@ async def change_status():
             if dev:
                 status = 'In Development'
             else:
-                status = '?help | {}'.format(choice(secrets['discord_status']))
+                status = '?help | {}'.format(choice(bot.config['discord']['status']))
             activity = Streaming(name=status, url='https://twitch.tv/twitch')
             await bot.change_presence(activity=activity)
         except Exception as e:
@@ -94,7 +97,8 @@ async def on_command_error(ctx, error):
     if isinstance(error, MissingRequiredArgument):
         return await ctx.send(f'Использование: {ctx.prefix}{ctx.command.usage or ctx.command.name}')
     elif isinstance(error, BadArgument):
-        return await ctx.send(f'Неверный тип аргумента\nИспользование: {ctx.prefix}{ctx.command.usage or ctx.command.name}')
+        return await ctx.send(
+            f'Неверный тип аргумента\nИспользование: {ctx.prefix}{ctx.command.usage or ctx.command.name}')
     elif isinstance(error, MusicCommandError):
         return await ctx.send(error.original)
     elif isinstance(error, CommandInvokeError) and str(error.original):
@@ -102,7 +106,20 @@ async def on_command_error(ctx, error):
         return await ctx.send(f'Ошибка:\n{error.original}')
 
 
-if dev:
-    bot.run(secrets['discord_alpha_token'])
-else:
-    bot.run(secrets['discord_bot_token'])
+async def main():
+    vault_client = AsyncVaultClient.from_env() if not dev else None
+    config = await async_load_config(vault_client=vault_client)
+    bot.config = config
+
+    try:
+        async with bot:
+            await bot.start(config['discord']['token'])
+    except KeyboardInterrupt:
+        # nothing to do here
+        # `asyncio.run` handles the loop cleanup
+        # and `self.start` closes all sockets and the HTTPClient instance.
+        return
+
+
+if __name__ == '__main__':
+    run(main())

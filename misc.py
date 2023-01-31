@@ -12,8 +12,6 @@ from discord import Embed, Color
 from discord.ext.commands import Cog, command, Bot
 from git import Repo
 
-from utils import secrets
-
 locale.setlocale(locale.LC_ALL, 'ru_RU.utf8')
 
 
@@ -325,7 +323,7 @@ class Misc(Cog):
             'q': ftitle
         }
         headers = {
-            'Authorization': 'Bearer ' + secrets['genius_token']
+            'Authorization': 'Bearer ' + self.bot.config['genius_token']
         }
         async with ClientSession() as client:
             req = await client.get('https://api.genius.com/search', params=params, headers=headers)
