@@ -164,7 +164,8 @@ class Spotify:
 
         self.token = None
 
-        self.loop.run_until_complete(self.get_token())
+    async def init(self):
+        await self.get_token()
 
     @staticmethod
     def _make_token_auth(client_id, client_secret):
@@ -425,6 +426,7 @@ class Player(DefaultPlayer):
         self.loop.create_task(update_queues(self))
 
 
-def init_spotify(config):
+async def init_spotify(config):
     global spotify
     spotify = Spotify(config['spotify']['client_id'], config['spotify']['client_secret'])
+    await spotify.init()

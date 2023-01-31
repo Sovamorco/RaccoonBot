@@ -502,5 +502,5 @@ class Music(Cog):
 
 
 async def music_setup(bot):
-    init_spotify(bot.config)
+    await init_spotify(bot.config)
     await bot.add_cog(Music(bot))
