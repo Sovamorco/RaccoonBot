@@ -17,7 +17,6 @@ vk_album_rx = re.compile(r'(?:audio_playlist|album\/|playlist\/)(-?[0-9]+)_([0-9
 vk_pers_rx = re.compile(r'audios(-?[0-9]+)')
 spotify_rx = re.compile(r'(?:spotify:|(?:https?:\/\/)?(?:www\.)?open\.spotify\.com\/)(playlist|track|album)(?:\:|\/)([a-zA-Z0-9]+)(.*)$')
 url_rx = re.compile(r'https?://(?:www\.)?.+')
-spotify: 'Spotify' = None
 
 
 class Track:
@@ -38,8 +37,8 @@ class Track:
     def uri(self):
         return self.url or str(self)
 
-    async def get_track(self, player, config):
-        track = await get_track(player, self.uri, config, True)
+    async def get_track(self, spotify, player, config):
+        track = await get_track(spotify, player, self.uri, config, True)
         if not isinstance(track, dict):
             return
         track['info']['author'] = self.author
@@ -63,7 +62,7 @@ class Playlist:
         old.description = f'Загрузка: {progress}/{total}'
         return old
 
-    async def add(self, player, requester, msg, config, force=False):
+    async def add(self, spotify, player, requester, msg, config, force=False):
         if not self.tracks:
             return
         simple = isinstance(self.tracks[0], dict)
@@ -74,7 +73,7 @@ class Playlist:
             if simple:
                 player.add(requester=requester, track=track, index=index)
             else:
-                audiotrack = await track.get_track(player, config)
+                audiotrack = await track.get_track(spotify, player, config)
                 if audiotrack:
                     player.add(requester=requester, track=audiotrack, index=index)
             if not player.is_playing:
@@ -156,11 +155,11 @@ class Spotify:
     OAUTH_TOKEN_URL = 'https://accounts.spotify.com/api/token'
     API_BASE = 'https://api.spotify.com/v1/'
 
-    def __init__(self, client_id, client_secret):
+    def __init__(self, client_id, client_secret, loop):
         self.client_id = client_id
         self.client_secret = client_secret
         self.aiosession = ClientSession()
-        self.loop = get_event_loop()
+        self.loop = loop
 
         self.token = None
 
@@ -193,7 +192,7 @@ class Spotify:
             return await r.json()
 
     async def make_post(self, url, payload, headers=None):
-        async with self.aiosession.post(url, data=payload, headers=headers) as r:
+        async with self.aiosession.post(url, data=payload, headers=headers, timeout=10) as r:
             return await r.json()
 
     async def get_token(self):
@@ -216,43 +215,40 @@ class Spotify:
         r = await self.make_post(self.OAUTH_TOKEN_URL, payload=payload, headers=headers)
         return r
 
+    async def get_spotify_track(self, uri):
+        res = await self.get_track(uri)
+        return Track(res["artists"][0]["name"], res["name"], show_url=res['external_urls']['spotify'])
 
-async def get_spotify_track(uri):
-    res = await spotify.get_track(uri)
-    return Track(res["artists"][0]["name"], res["name"], show_url=res['external_urls']['spotify'])
+    async def get_spotify_album(self, uri):
+        res = await self.get_album(uri)
+        tracks = [Track(item['artists'][0]['name'], item['name'], show_url=item['external_urls']['spotify']) for item in res['tracks']['items']]
+        return Playlist(res['name'], tracks)
 
-
-async def get_spotify_album(uri):
-    res = await spotify.get_album(uri)
-    tracks = [Track(item['artists'][0]['name'], item['name'], show_url=item['external_urls']['spotify']) for item in res['tracks']['items']]
-    return Playlist(res['name'], tracks)
-
-
-async def get_spotify_playlist(uri):
-    res = []
-    r = await spotify.get_playlist_tracks(uri)
-    while True:
-        res.extend(r['items'])
-        if r['next'] is None:
-            break
-        r = await spotify.make_spotify_req(r['next'])
-    tracks = [Track(item['track']['artists'][0]['name'], item['track']['name'], show_url=item['track']['external_urls']['spotify']) for item in res if not item['is_local']]
-    playlist = await spotify.get_playlist(uri)
-    return Playlist(playlist['name'], tracks)
+    async def get_spotify_playlist(self, uri):
+        res = []
+        r = await self.get_playlist_tracks(uri)
+        while True:
+            res.extend(r['items'])
+            if r['next'] is None:
+                break
+            r = await self.make_spotify_req(r['next'])
+        tracks = [Track(item['track']['artists'][0]['name'], item['track']['name'], show_url=item['track']['external_urls']['spotify']) for item in res if not item['is_local']]
+        playlist = await self.get_playlist(uri)
+        return Playlist(playlist['name'], tracks)
 
 
-async def get_track(player, query, config, force_first=False):
+async def get_track(spotify, player, query, config, force_first=False):
     query = query.strip('<>')
     spm = spotify_rx.match(query)
     if spm:
         typ = spm.group(1)
         iden = spm.group(2)
         if typ == 'track':
-            return await get_spotify_track(iden)
+            return await spotify.get_spotify_track(iden)
         elif typ == 'album':
-            return await get_spotify_album(iden)
+            return await spotify.get_spotify_album(iden)
         elif typ == 'playlist':
-            return await get_spotify_playlist(iden)
+            return await spotify.get_spotify_playlist(iden)
     is_url = bool(url_rx.match(query))
     if is_url:
         if vk_album_rx.search(query):
@@ -415,7 +411,7 @@ async def update_queues(event):
 class Player(DefaultPlayer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.loop = get_event_loop()
+        self.event_loop = get_event_loop()
 
     async def play(self, *args, **kwargs):
         await super().play(*args, **kwargs)
@@ -423,10 +419,12 @@ class Player(DefaultPlayer):
 
     def add(self, *args, **kwargs):
         super().add(*args, **kwargs)
-        self.loop.create_task(update_queues(self))
+        self.event_loop.create_task(update_queues(self))
 
 
-async def init_spotify(config):
-    global spotify
-    spotify = Spotify(config['spotify']['client_id'], config['spotify']['client_secret'])
+async def init_spotify(config, loop):
+    if config.get('spotify') is None:
+        return
+    spotify = Spotify(config['spotify']['client_id'], config['spotify']['client_secret'], loop)
     await spotify.init()
+    return spotify

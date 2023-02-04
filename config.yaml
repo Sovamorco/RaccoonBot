@@ -12,3 +12,5 @@ lavalink: VAULT->raccoonbot/lavalink
 
 genius_token: VAULT->raccoonbot/genius_token
 gachi_things: VAULT->raccoonbot/gachi_things
+
+db: VAULT->raccoonbot/db_connection_profile

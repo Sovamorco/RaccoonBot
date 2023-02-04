@@ -24,22 +24,13 @@ class Misc(Cog):
         user = ctx.author
         if msg is None:
             msg = user.mention
-        with open('resources/raccoons.txt', 'r') as f:
-            raccoons = load(f)
-            raccoon = choice(raccoons)
+        raccoon = await self.bot.sql_client.sql_req(
+            'SELECT url FROM raccoons ORDER BY RAND() LIMIT 1', fetch_one=True
+        )
+        if raccoon is None:
+            return await ctx.send(f'{user.mention}, еноты кончились')
         embed = Embed(color=Color.dark_purple())
-        embed.set_image(url=raccoon)
-        return await ctx.send(msg, embed=embed)
-
-    @command(name='fact', aliases=['facts'], help='Команда, возвращающая случайные факты')
-    async def fact_(self, ctx, *, msg=None):
-        user = ctx.author
-        if msg is None:
-            msg = user.mention
-        with open('resources/facts.json', 'r') as f:
-            facts = load(f)
-            fact = choice(facts)
-        embed = Embed(color=Color.dark_purple(), description=fact)
+        embed.set_image(url=raccoon['url'])
         return await ctx.send(msg, embed=embed)
 
     @command(name='wikia', aliases=['wiki'], help='Команда для поиска статей на Fandom\nКриво работает, лучше использовать команду fandom',

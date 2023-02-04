@@ -48,9 +48,14 @@ class Moderation(Cog):
             for pr in prefixes:
                 if sid not in pr:
                     return await ctx.send('Текущий префикс: {}'.format(pr))
-        pfxs = load(open('resources/prefixes.json', 'r'))
-        pfxs[str(ctx.guild.id)] = pref
-        dump(pfxs, open('resources/prefixes.json', 'w'))
+            return await ctx.send('Префикса не будет')
+
+        if not ctx.guild:
+            return await ctx.send('Нельзя установить префикс вне сервера')
+        await self.bot.sql_client.sql_req(
+            'INSERT INTO server_data (id, prefix) VALUES (%s, %s) ON DUPLICATE KEY UPDATE prefix=%s',
+            ctx.guild.id, pref, pref,
+        )
         return await ctx.send('Префикс установлен на {}'.format(pref))
 
     @command(name='ping', pass_context=True, help='Команда для проверки жизнеспособности бота')

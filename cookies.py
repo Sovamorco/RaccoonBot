@@ -1,6 +1,6 @@
+import asyncio
 from asyncio import sleep
-from json import load, dump
-from pathlib import Path
+from itertools import islice
 from random import randrange, randint
 
 from discord import Status, Embed, Color
@@ -24,80 +24,58 @@ def draw(deck):
     return deck.pop(randint(0, len(deck) - 1))
 
 
-def add(userid, amt):
-    cookies = load(open('resources/cookies.json', 'r'))
-    cookies[str(userid)]['cookies'] += amt
-    dump(cookies, open('resources/cookies.json', 'w'))
-
-
-def get_cookies(userid):
-    cookies = load(open('resources/cookies.json', 'r')).get(str(userid), None)
-    if cookies is None:
-        return None
-    cookies = cookies['cookies']
-    return cookies
-
-
 class Cookies(Cog):
     def __init__(self, bot: Bot):
-        cookies = Path('resources/cookies.json')
-        if not cookies.exists():
-            cookies.write_text('{}')
         self.bot = bot
-        self.bot.loop.create_task(self.add_cookies())
+        self.bot.loop.create_task(self.cookies_loop())
 
-    async def add_cookies(self):
+    async def cookies_loop(self):
         while True:
             try:
                 guilds = self.bot.guilds
-                cookies = load(open('resources/cookies.json', 'r'))
                 online = {}
                 for guild in guilds:
                     members = guild.members
                     for member in members:
                         if member.status == Status.online and not member.bot:
                             voice = bool(member.voice)
-                            if (str(member.id) not in online.keys()) or voice:
-                                online[str(member.id)] = {'nick': member.name, 'voice': voice}
-                for user_id in online.keys():
-                    if str(user_id) in cookies.keys():
-                        if online[user_id]['voice']:
-                            cookies[user_id]['cookies'] += randrange(31, 35)
-                        else:
-                            cookies[user_id]['cookies'] += randrange(11, 15)
-                    else:
-                        cookies[user_id] = {'id': int(user_id), 'name': online[user_id]['nick'],
-                                            'cookies': randrange(289, 296)}
-                dump(cookies, open('resources/cookies.json', 'w'))
+                            if (member.id not in online.keys()) or voice:
+                                online[member.id] = {'nick': member.name, 'voice': voice}
+                for user_id, user in online.items():
+                    await self.add(user_id, randrange(31, 35) if user['voice'] else randrange(11, 15))
             except Exception as e:
                 print(f'Exception in cookies loop:\n{e}')
             finally:
                 await sleep(300)
 
+    async def add(self, userid, amt):
+        await self.bot.sql_client.sql_req(
+            'INSERT INTO cookies (id, cookies) VALUES (%s, %s) ON DUPLICATE KEY UPDATE cookies=cookies+%s',
+            userid, randrange(289, 296) + amt, amt,
+        )
+
+    async def get(self, userid):
+        cookies = await self.bot.sql_client.sql_req('SELECT cookies FROM cookies WHERE id=%s', userid, fetch_one=True)
+        if cookies is None:
+            return None
+        return cookies['cookies']
+
     @Cog.listener()
     async def on_member_join(self, member):
         if not member.bot:
-            cookies = load(open('resources/cookies.json', 'r'))
-            if str(member.id) not in cookies.keys():
-                cookies[str(member.id)] = {'id': member.id, 'name': member.name, 'cookies': randrange(289, 296)}
-            dump(cookies, open('resources/cookies.json', 'w'))
+            await self.add(member.id, 0)
 
     @Cog.listener()
     async def on_message(self, message):
         ctx = await self.bot.get_context(message)
-        user = ctx.author
-        if not user.bot and not ctx.valid:
-            cookies = load(open('resources/cookies.json', 'r'))
-            if str(user.id) not in cookies.keys():
-                cookies[str(user.id)] = {'id': user.id, 'name': user.name, 'cookies': randrange(289, 296)}
-            else:
-                cookies[str(user.id)]['cookies'] += randrange(10, 17)
-            dump(cookies, open('resources/cookies.json', 'w'))
+        # if author is not a bot and message is not a command
+        if not ctx.author.bot and not ctx.valid:
+            await self.add(ctx.author.id, randrange(10, 17))
 
     @command(name='cookies', aliases=['points'], help='Команда для отображения печенек')
     async def cookies_(self, ctx):
         user = ctx.author
-        cookies = get_cookies(user.id)
+        cookies = await self.get(user.id)
         if cookies is None:
             return await ctx.send('У {} нет печенек'.format(user.mention))
         return await ctx.send(
@@ -105,42 +83,45 @@ class Cookies(Cog):
 
     @command(name='leaderboard', aliases=['lb'], help='Команда для отображения топа печенек')
     async def leaderboard_(self, ctx):
-        cookies = load(open('resources/cookies.json', 'r'))
-        cookies = sorted(cookies.items(), key=lambda kv: kv[1]['cookies'], reverse=True)
-        length = 10 if len(cookies) > 10 else len(cookies)
+        cookies = await self.bot.sql_client.sql_req(
+            'SELECT id, cookies FROM cookies ORDER BY cookies DESC',
+            fetch_all=True,
+        )
         embed = Embed(color=Color.dark_purple())
-        embedValue = ''
-        for i in range(length):
-            amt = cookies[i][1]['cookies']
-            embedValue += '{}. {}: {:,} {}\n\n'.format(i + 1, cookies[i][1]['name'], amt, sform(amt, 'печенька'))
-        embed.add_field(name='Глобальный топ', value=embedValue, inline=False)
-        embed.add_field(name='\u200b', value='\u200b', inline=False)
-        embedValue = ''
-        i = 0
-        for holder in cookies:
-            if ctx.guild.get_member(holder[1]['id']) is not None:
-                amt = holder[1]['cookies']
-                embedValue += '{}. {}: {:,} {}\n\n'.format(i + 1, holder[1]['name'], amt, sform(amt, 'печенька'))
-                i += 1
-                if i == length:
-                    break
-        embed.add_field(name='Топ сервера', value=embedValue, inline=False)
+
+        async def get_lb_entry(pos, obj):
+            user = await self.bot.fetch_user(obj['id'])
+            return '{}. **{}**: {:,} {}'.format(pos + 1, user.name, obj['cookies'], sform(obj['cookies'], 'печенька'))
+
+        global_lb = '\n'.join(await asyncio.gather(
+            *[get_lb_entry(_pos, _obj) for _pos, _obj in enumerate(cookies[:10])]
+        ))
+
+        embed.add_field(name='Глобальный топ', value=global_lb, inline=True)
+
+        local_entries = islice((entry for entry in cookies if ctx.guild.get_member(entry['id']) is not None), 10)
+        local_lb = '\n'.join(await asyncio.gather(
+            *[get_lb_entry(_pos, _obj) for _pos, _obj in enumerate(local_entries)]
+        ))
+
+        embed.add_field(name='Топ сервера', value=local_lb, inline=True)
         return await ctx.send('{}'.format(ctx.author.mention), embed=embed)
 
-    @command(name='blackjack', aliases=['bj'], help='Команда для игры в Блэкджек\nПравила:\n- Дилер перестает брать на 17',
+    @command(name='blackjack', aliases=['bj'],
+             help='Команда для игры в Блэкджек\nПравила:\n- Дилер перестает брать на 17',
              usage='blackjack <ставка>')
     async def bj_(self, ctx, amt: int):
         if amt <= 0:
             return await ctx.send('Ставка должна быть положительным числом')
         user = ctx.author
-        cookies = get_cookies(user.id)
+        cookies = await self.get(user.id)
         if cookies is None:
             return await ctx.send('У вас нет печенек')
         if amt > cookies:
             return await ctx.send('У вас недостаточно печенек ({:,}, а необходимо {:,})'.format(cookies, amt))
         deck = gen_deck()
-        add(user.id, -1 * amt)
-        cookies = get_cookies(user.id)
+        await self.add(user.id, -1 * amt)
+        cookies = await self.get(user.id)
         fst, snd, trd, frt = draw(deck), draw(deck), draw(deck), draw(deck)
         hand = [fst[1], trd[1]]
         split = [hand]
@@ -153,13 +134,16 @@ class Cookies(Cog):
         embed = Embed(color=Color.dark_purple(), title='Ход игры', description=embedValue)
         msg = await ctx.send(embed=embed)
         if sum(split[0]) == 21:
-            add(user.id, amt * 2)
-            cookies = get_cookies(user.id)
-            embed.description += '\n\nУ вас блэкджек, вы выиграли\nТеперь у вас {:,} {}'.format(cookies, sform(cookies, 'печенька'))
+            await self.add(user.id, amt * 2)
+            cookies = await self.get(user.id)
+            embed.description += '\n\nУ вас блэкджек, вы выиграли\nТеперь у вас {:,} {}'.format(cookies, sform(cookies,
+                                                                                                               'печенька'))
             return await msg.edit(embed=embed)
         if sum(dealer) == 21:
-            cookies = get_cookies(user.id)
-            embed.description += '\n\nУ дилера блэкджек, вы проиграли\nТеперь у вас {:,} {}'.format(cookies, sform(cookies, 'печенька'))
+            cookies = await self.get(user.id)
+            embed.description += '\n\nУ дилера блэкджек, вы проиграли\nТеперь у вас {:,} {}'.format(cookies,
+                                                                                                    sform(cookies,
+                                                                                                          'печенька'))
             return await msg.edit(embed=embed)
 
         def verify(m):
@@ -180,7 +164,7 @@ class Cookies(Cog):
             response = await self.bot.wait_for('message', check=versplit, timeout=300)
             if response.content.lower() == 'да':
                 split = ([hand[0]], [hand[1]])
-                add(user.id, -1 * amt)
+                await self.add(user.id, -1 * amt)
                 spamt = [amt] * 2
         num = 0
         snum = ''
@@ -194,7 +178,7 @@ class Cookies(Cog):
                 Сумма карт у вас в руке{} - {}
                 Хотите взять карту?
                 (hit - взять, stand - пас)'''.format(snum, sum(hand))
-                cookies = get_cookies(user.id)
+                cookies = await self.get(user.id)
                 if cookies >= amt:
                     embed.description += '\nВы можете удвоить ставку (dd)'
                 embed.description += '\nАвтоматическая отмена через 300 секунд'
@@ -213,12 +197,13 @@ class Cookies(Cog):
                             hand[hand.index(11)] = 1
                             await msg.edit(embed=embed)
                         else:
-                            cookies = get_cookies(user.id)
-                            embed.description += '\n\nУ вас больше 21 очка, вы проиграли\nТеперь у вас {:,} {}'.format(cookies, sform(cookies, 'печенька'))
+                            cookies = await self.get(user.id)
+                            embed.description += '\n\nУ вас больше 21 очка, вы проиграли\nТеперь у вас {:,} {}'.format(
+                                cookies, sform(cookies, 'печенька'))
                             await msg.edit(embed=embed)
                             break
                 if response.content.lower() == 'dd':
-                    add(user.id, -1 * amt)
+                    await self.add(user.id, -1 * amt)
                     if len(split) == 2:
                         # noinspection PyUnboundLocalVariable
                         spamt[num - 1] *= 2
@@ -237,14 +222,16 @@ class Cookies(Cog):
                             hand[hand.index(11)] = 1
                             await msg.edit(embed=embed)
                         else:
-                            cookies = get_cookies(user.id)
-                            embed.description += '\n\nУ вас больше 21 очка, вы проиграли\nТеперь у вас {:,} {}'.format(cookies, sform(cookies, 'печенька'))
+                            cookies = await self.get(user.id)
+                            embed.description += '\n\nУ вас больше 21 очка, вы проиграли\nТеперь у вас {:,} {}'.format(
+                                cookies, sform(cookies, 'печенька'))
                             await msg.edit(embed=embed)
                             break
                     embed.description += '\nСумма карт у вас в руке{} - {}'.format(snum, sum(hand))
                     break
                 if response.content.lower() == 'stand':
-                    embed.description += '\n\nВы оставили текущую руку\nСумма карт у вас в руке{} - {}'.format(snum, sum(hand))
+                    embed.description += '\n\nВы оставили текущую руку\nСумма карт у вас в руке{} - {}'.format(snum,
+                                                                                                               sum(hand))
                     break
         if len(split) == 1 and sum(split[0]) > 21:
             return
@@ -263,11 +250,14 @@ class Cookies(Cog):
                     if len(split) == 2:
                         for i in range(len(split)):
                             if sum(split[i]) <= 21:
-                                add(user.id, spamt[i] * 2)
+                                await self.add(user.id, spamt[i] * 2)
                     else:
-                        add(user.id, amt * 2)
-                    cookies = get_cookies(user.id)
-                    embed.description += '\nУ дилера больше 21 очка, вы победили\nТеперь у вас {:,} {}'.format(cookies, sform(cookies, 'печенька'))
+                        await self.add(user.id, amt * 2)
+                    cookies = await self.get(user.id)
+                    embed.description += '\nУ дилера больше 21 очка, вы победили\nТеперь у вас {:,} {}'.format(cookies,
+                                                                                                               sform(
+                                                                                                                   cookies,
+                                                                                                                   'печенька'))
                     return await msg.edit(embed=embed)
         embed.description += '\nСумма карт в руке в дилера - {}'.format(sum(dealer))
         num = 0
@@ -279,20 +269,23 @@ class Cookies(Cog):
                     embed.description += '\n\nРука {}'.format(num)
                     amt = spamt[num - 1]
                 if sum(dealer) == sum(hand):
-                    add(user.id, amt)
-                    cookies = get_cookies(user.id)
-                    embed.description += '\nУ вас одинаковый счет, вам возвращена ставка\nТеперь у вас {:,} {}'.format(cookies, sform(cookies, 'печенька'))
+                    await self.add(user.id, amt)
+                    cookies = await self.get(user.id)
+                    embed.description += '\nУ вас одинаковый счет, вам возвращена ставка\nТеперь у вас {:,} {}'.format(
+                        cookies, sform(cookies, 'печенька'))
                     await msg.edit(embed=embed)
                 if sum(dealer) > sum(hand):
-                    cookies = get_cookies(user.id)
-                    embed.description += '\nУ вас меньше очков, чем у дилера\nВы проиграли\nТеперь у вас {:,} {}'.format(cookies,
-                                                                                                                         sform(cookies, 'печенька'))
+                    cookies = await self.get(user.id)
+                    embed.description += '\nУ вас меньше очков, чем у дилера\nВы проиграли\nТеперь у вас {:,} {}'.format(
+                        cookies,
+                        sform(cookies, 'печенька'))
                     await msg.edit(embed=embed)
                 if sum(hand) > sum(dealer):
-                    cookies = get_cookies(user.id)
-                    add(user.id, amt * 2)
-                    cookies = get_cookies(user.id)
-                    embed.description += '\nУ вас больше очков, чем у дилера\nВы победили\nТеперь у вас {:,} {}'.format(cookies, sform(cookies, 'печенька'))
+                    cookies = await self.get(user.id)
+                    await self.add(user.id, amt * 2)
+                    cookies = await self.get(user.id)
+                    embed.description += '\nУ вас больше очков, чем у дилера\nВы победили\nТеперь у вас {:,} {}'.format(
+                        cookies, sform(cookies, 'печенька'))
                     await msg.edit(embed=embed)
 
 

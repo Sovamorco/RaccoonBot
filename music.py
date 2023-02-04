@@ -1,16 +1,11 @@
 from asyncio import sleep
-from json import load, dump
-from os import path, listdir, remove
-from pathlib import Path
-from pickle import load as pload, dump as pdump
-from random import sample, choice, shuffle
+from random import shuffle
 from textwrap import wrap
 
 from bs4 import BeautifulSoup
 from discord import VoiceClient
 from discord.ext.commands import Cog, command, Bot
-from lavalink import Client, NodeException, format_time, add_event_hook, TrackEndEvent
-from pathvalidate import validate_filename, ValidationError
+from lavalink import Client, NodeError, format_time, add_event_hook, TrackEndEvent
 
 from music_funcs import *
 
@@ -74,6 +69,8 @@ class LavalinkVoiceClient(VoiceClient):
 
 class Music(Cog):
     def __init__(self, bot: Bot):
+        # initialized in initialize()
+        self.spotify: Spotify = None
         self.bot = bot
 
         if not hasattr(bot, 'lavalink'):
@@ -83,31 +80,26 @@ class Music(Cog):
             lc.add_node(addr, 2333, pw, 'de', 'default-node')
             self.bot.lavalink = lc
 
-            self.bot.loop.create_task(self.initialize())
-
         add_event_hook(update_queues, event=TrackEndEvent)
 
     async def initialize(self):
-        saved = Path('resources/saved.json')
-        if not saved.exists():
-            saved.write_text('{}')
-        saved = load(open('resources/saved.json', 'r'))
+        print('Initializing spotify')
+        self.spotify = await init_spotify(self.bot.config, self.bot.loop)
+        print('Initializing lavalink')
+        saved_settings = await self.bot.sql_client.sql_req(
+            'SELECT id, volume, shuffle FROM server_data', fetch_all=True
+        )
         while True:
+            print('Trying to connect to lavalink')
             try:
-                for guild in self.bot.guilds:
-                    player = self.bot.lavalink.player_manager.create(guild.id)
-                    if str(guild.id) not in saved.keys():
-                        saved[str(guild.id)] = {}
-                        saved[str(guild.id)]['volume'] = 100
-                        saved[str(guild.id)]['shuffle'] = False
-                    else:
-                        await player.set_volume(saved[str(guild.id)]['volume'])
-                        player.shuffle = saved[str(guild.id)]['shuffle']
-                    dump(saved, open('resources/saved.json', 'w'))
-            except NodeException:
+                for saved in saved_settings:
+                    player = self.bot.lavalink.player_manager.create(saved['id'])
+                    await player.set_volume(saved['volume'])
+                    player.shuffle = saved['shuffle']
+            except NodeError:
                 await sleep(1)
             else:
-                print('Initialized!')
+                print('Initialized lavalink')
                 break
 
     async def stop_playing(self, guild_id):
@@ -116,14 +108,6 @@ class Music(Cog):
         await player.stop()
         guild = self.bot.get_guild(guild_id)
         await guild.voice_client.disconnect(force=True)
-
-    @Cog.listener()
-    async def on_guild_join(self, guild):
-        saved = load(open('resources/saved.json', 'r'))
-        saved[str(guild.id)] = {}
-        saved[str(guild.id)]['volume'] = 100
-        saved[str(guild.id)]['shuffle'] = False
-        dump(saved, open('resources/saved.json', 'w'))
 
     @Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -160,7 +144,7 @@ class Music(Cog):
                 return await player.play()
             else:
                 return await ctx.send(f'Использование: {ctx.prefix}[p|play] <ссылка/название>')
-        res = await get_track(player, query, self.bot.config)
+        res = await get_track(self.spotify, player, query, self.bot.config)
         if not isinstance(res, (Track, Playlist, dict, list)):
             if isinstance(res, Embed):
                 return await ctx.send(embed=res)
@@ -172,7 +156,7 @@ class Music(Cog):
             embed.description = f'[{res["info"]["title"]}]({res["info"]["uri"]})'
             player.add(requester=ctx.author.id, track=res, index=index)
         elif isinstance(res, Track):
-            track = await res.get_track(player, self.bot.config)
+            track = await res.get_track(self.spotify, player, self.bot.config)
             embed.title = '✅Трек добавлен'
             embed.description = f'[{res}]({res.show_url})'
             player.add(requester=ctx.author.id, track=track, index=index)
@@ -183,7 +167,7 @@ class Music(Cog):
             embed.title = '✅Плейлист добавлен'
             embed.description = f'{res.title} ({len(res.tracks)} {sform(len(res.tracks), "трек")})'
             procmsg = await ctx.send(embed=Embed(title=f'Плейлист "{res}" загружается...', color=color))
-            await res.add(player, ctx.author.id, procmsg, self.bot.config, force)
+            await res.add(self.spotify, player, ctx.author.id, procmsg, self.bot.config, force)
             await procmsg.delete()
         elif isinstance(res, list):
             embed_value = ''
@@ -223,22 +207,6 @@ class Music(Cog):
     @command(aliases=['fp'], usage='force <ссылка/название>', help='Команда для добавления трека в начало очереди')
     async def force(self, ctx, *, query=''):
         return await self._play(ctx, query, True)
-
-    @command(usage='gachi [кол-во]', help='Команда для проигрывания правильных версий музыки',
-             aliases=['gachi'])
-    async def gachibass(self, ctx, amt: int = 1):
-        if amt > 100 or amt < 1:
-            return await ctx.send('Нет')
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
-        with open('resources/gachi.txt', 'r') as f:
-            tracks = load(f)
-        tracks = sample(tracks, amt)
-        player.add(requester=ctx.author.id, track=tracks.pop(0))
-        await ctx.send(choice(self.bot.config['gachi_things']))
-        if not player.is_playing:
-            await player.play()
-        for track in tracks:
-            player.add(requester=ctx.author.id, track=track)
 
     @command(help='Команда для перемотки музыки', usage='seek <время в секундах>')
     async def seek(self, ctx, *, seconds: int):
@@ -340,79 +308,6 @@ class Music(Cog):
         queues.append(queue)
         return await queue.send()
 
-    @command(usage='save <название>', help='Команда для сохранения текущей очереди в плейлист')
-    async def save(self, ctx, *, name):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
-        if not player.queue and not player.current:
-            return await ctx.send('Очередь пустая')
-        playlists = listdir(path.join('resources', 'playlists'))
-        playlist_name = f'{ctx.author.id}_{name.lower()}'
-        try:
-            validate_filename(playlist_name)
-        except ValidationError:
-            return await ctx.send('Запрещенные символы в названии плейлиста')
-        if playlist_name in playlists:
-            return await ctx.send(
-                f'Плейлист с таким названием уже существует\nДля удаления плейлиста используйте {ctx.prefix}delete <название>')
-        if len(name) > 100:
-            return await ctx.send('Слишком длинное название для плейлиста')
-        local_queue = player.queue.copy() if player.queue else []
-        if player.current:
-            local_queue.insert(0, player.current)
-        with open(path.join('resources', 'playlists', playlist_name), 'wb+') as queue_file:
-            pdump(local_queue, queue_file)
-        ln = len(local_queue)
-        return await ctx.send(f'Плейлист {name} [{ln} {sform(ln, "трек")}] сохранен')
-
-    @command(usage='load <название>', help='Команда для загрузки плейлиста в очередь')
-    async def load(self, ctx, *, name):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
-        playlists = listdir(path.join('resources', 'playlists'))
-        playlist_name = f'{ctx.author.id}_{name.lower()}'
-        try:
-            validate_filename(playlist_name)
-        except ValidationError:
-            return await ctx.send('Запрещенные символы в названии плейлиста')
-        if playlist_name not in playlists:
-            return await ctx.send(
-                f'Нет плейлиста с таким названием\nДля просмотра своих плейлистов используйте {ctx.prefix}playlists')
-        with open(path.join('resources', 'playlists', playlist_name), 'rb') as queue_file:
-            queue = pload(queue_file)
-        for track in queue:
-            player.add(requester=ctx.author.id, track=track)
-        ln = len(queue)
-        await ctx.send(f'Плейлист {name} [{ln} {sform(ln, "трек")}] добавлен в очередь')
-        if not player.is_playing:
-            await player.play()
-
-    @command(usage='delete <название>', help='Команда для удаления сохраненного плейлиста')
-    async def delete(self, ctx, *, name):
-        playlists = listdir(path.join('resources', 'playlists'))
-        playlist_name = f'{ctx.author.id}_{name.lower()}'
-        try:
-            validate_filename(playlist_name)
-        except ValidationError:
-            return await ctx.send('Запрещенные символы в названии плейлиста')
-        if playlist_name not in playlists:
-            return await ctx.send(
-                f'Нет плейлиста с таким названием\nДля просмотра своих плейлистов используйте {ctx.prefix}playlists')
-        remove(path.join('resources', 'playlists', playlist_name))
-        return await ctx.send(f'Плейлист {name} удален!')
-
-    @command(help='Команда для просмотра списка сохраненных плейлистов')
-    async def playlists(self, ctx):
-        playlists = listdir(path.join('resources', 'playlists'))
-        personal = []
-        for playlist in playlists:
-            user_id, name = playlist.split('_', 1)
-            if int(user_id) == ctx.author.id:
-                personal.append(name)
-        if not personal:
-            return await ctx.send('У вас нет сохраненных плейлистов!')
-        embed = Embed(color=Color.dark_purple(), title='Сохраненные плейлисты',
-                      description='\n'.join([f'{i + 1}. {name}' for i, name in enumerate(personal)]))
-        return await ctx.send(embed=embed)
-
     @command(aliases=['resume'],
              help='Команда для приостановки или продолжения поспроизведения воспроизведения')
     async def pause(self, ctx):
@@ -430,18 +325,20 @@ class Music(Cog):
             return await ctx.send(f'🔈 | {player.volume}%')
         await player.set_volume(volume)
         await ctx.message.add_reaction('👌')
-        vols = load(open('resources/saved.json', 'r'))
-        vols[str(ctx.guild.id)]['volume'] = player.volume
-        dump(vols, open('resources/saved.json', 'w'))
+        await self.bot.sql_client.sql_req(
+            'INSERT INTO server_data (id, volume) VALUES (%s, %s) ON DUPLICATE KEY UPDATE volume=%s',
+            ctx.guild.id, player.volume, player.volume,
+        )
 
     @command(help='Команда для включения/выключения перемешивания очереди')
     async def shuffle(self, ctx):
         player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         player.shuffle = not player.shuffle
-        shffl = load(open('resources/saved.json', 'r'))
-        shffl[str(ctx.guild.id)]['shuffle'] = player.shuffle
-        dump(shffl, open('resources/saved.json', 'w'))
         await ctx.send('🔀 | Перемешивание ' + ('включено' if player.shuffle else 'выключено'))
+        await self.bot.sql_client.sql_req(
+            'INSERT INTO server_data (id, shuffle) VALUES (%s, %s) ON DUPLICATE KEY UPDATE shuffle=%s',
+            ctx.guild.id, player.shuffle, player.shuffle,
+        )
 
     @command(help='Команда для перемешивания текущей очереди', aliases=['qs'])
     async def qshuffle(self, ctx):
@@ -477,8 +374,8 @@ class Music(Cog):
 
     async def ensure_voice(self, ctx):
         player = self.bot.lavalink.player_manager.create(ctx.guild.id)
-        should_connect = ctx.command.name in ('play', 'force', 'join', 'gachibass', 'move', 'load')
-        ignored = ctx.command.name in ('volume', 'shuffle', 'playlists', 'delete', 'queue', 'now')
+        should_connect = ctx.command.name in ('play', 'force', 'join', 'gachibass', 'move')
+        ignored = ctx.command.name in ('volume', 'shuffle', 'delete', 'queue', 'now')
         if ignored:
             return
         if not ctx.author.voice or not ctx.author.voice.channel:
@@ -502,5 +399,6 @@ class Music(Cog):
 
 
 async def music_setup(bot):
-    await init_spotify(bot.config)
-    await bot.add_cog(Music(bot))
+    cog = Music(bot)
+    await cog.initialize()
+    await bot.add_cog(cog)

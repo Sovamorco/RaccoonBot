@@ -1,12 +1,13 @@
 from asyncio import run
 from traceback import print_exception
 
-from common import async_load_config, AsyncVaultClient
+from common import async_load_config, AsyncVaultClient, AsyncSQLClient
 from discord import ClientException, Streaming, Intents
 from discord.ext.commands import when_mentioned_or, MissingRequiredArgument, BadArgument
 
 from cookies import *
 from games import *
+from migrate import migrate
 from misc import *
 from moderation import *
 from music import *
@@ -15,11 +16,12 @@ from utils import dev
 default_prefix = '?'
 
 
-def prefix(dbot, msg):
-    destid = str(msg.guild.id) if msg.guild else str(msg.author.id)
-    prefixes = load(open('resources/prefixes.json', 'r'))
-    pr = 'r?' if dev else prefixes.get(destid, default_prefix)
-    return when_mentioned_or(pr)(dbot, msg)
+async def prefix(dbot, msg):
+    if not msg.guild:
+        return ''
+    prefix_d = await dbot.sql_client.sql_req('SELECT prefix FROM server_data WHERE id=%s', msg.guild.id, fetch_one=True)
+    prefix_s = default_prefix if prefix_d is None else prefix_d['prefix']
+    return when_mentioned_or(prefix_s)(dbot, msg)
 
 
 bot = Bot(command_prefix=prefix, description='Cutest bot on Discord (subjective)', case_insensitive=True,
@@ -30,10 +32,7 @@ bot.remove_command('help')
 async def change_status():
     while True:
         try:
-            if dev:
-                status = 'In Development'
-            else:
-                status = '?help | {}'.format(choice(bot.config['discord']['status']))
+            status = '?help | {}'.format(choice(bot.config['discord']['status']))
             activity = Streaming(name=status, url='https://twitch.tv/twitch')
             await bot.change_presence(activity=activity)
         except Exception as e:
@@ -44,10 +43,6 @@ async def change_status():
 
 @bot.event
 async def on_ready():
-    Path('resources').mkdir(exist_ok=True)
-    prefixes = Path('resources/prefixes.json')
-    if not prefixes.exists():
-        prefixes.write_text('{}')
     bot.loop.create_task(change_status())
     try:
         await misc_setup(bot)
@@ -108,8 +103,14 @@ async def on_command_error(ctx, error):
 
 async def main():
     vault_client = AsyncVaultClient.from_env() if not dev else None
-    config = await async_load_config(vault_client=vault_client)
+    config = await async_load_config('config.dev.yaml' if dev else 'config.yaml', vault_client=vault_client)
+    sql_client = AsyncSQLClient(config['db'], vault_client)
+    await sql_client.refresh()
+    # not async but can only be done once so whatever tbh
+    migrate(sql_client.config)
+
     bot.config = config
+    bot.sql_client = sql_client
 
     try:
         async with bot:
