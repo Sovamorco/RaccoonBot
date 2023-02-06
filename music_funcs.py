@@ -1,4 +1,4 @@
-from asyncio import get_event_loop
+from asyncio import get_event_loop, gather
 from base64 import b64encode
 from math import ceil
 from time import time
@@ -51,7 +51,7 @@ class Playlist:
     def __init__(self, title, tracks):
         self.title = title
         self.tracks = tracks
-        self.message_update_frequency = 5
+        self.message_update_frequency = 2  # seconds
 
     def __str__(self):
         return self.title
@@ -69,17 +69,37 @@ class Playlist:
         tracks = reversed(self.tracks) if force else self.tracks
         index = 0 if force else None
         await msg.edit(embed=self.get_embed(msg, 0, len(tracks)))
-        for i, track in enumerate(tracks):
-            if simple:
-                player.add(requester=requester, track=track, index=index)
-            else:
-                audiotrack = await track.get_track(spotify, player, config)
-                if audiotrack:
-                    player.add(requester=requester, track=audiotrack, index=index)
-            if not player.is_playing:
-                await player.play()
-            if (i + 1) % self.message_update_frequency == 0:
-                await msg.edit(embed=self.get_embed(msg, i + 1, len(tracks)))
+        loaded = 0
+        last_update = time()
+        message_update_lock = False
+
+        async def load_track(track):
+            nonlocal loaded, last_update, message_update_lock
+            loaded_track = await track.get_track(spotify, player, config)
+            loaded += 1
+            if not message_update_lock and time() - last_update > self.message_update_frequency:
+                message_update_lock = True
+                await msg.edit(embed=self.get_embed(msg, loaded + 1, len(tracks)))
+                last_update = time()
+                message_update_lock = False
+            return loaded_track
+
+        if simple:
+            # make it into a generator for convenience
+            loaded_tracks = (track for track in tracks)
+        else:
+            loaded_tracks = filter(None, await gather(*[
+                load_track(track) for track in tracks
+            ]))
+
+        try:
+            player.add(requester=requester, track=next(loaded_tracks), index=index)
+        except StopIteration:
+            return
+        if not player.is_playing:
+            await player.play()
+        for track in loaded_tracks:
+            player.add(requester=requester, track=track, index=index)
 
 
 async def get_vk_album(url, config):
