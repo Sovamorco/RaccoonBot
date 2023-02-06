@@ -5,7 +5,7 @@ from textwrap import wrap
 from bs4 import BeautifulSoup
 from discord import VoiceClient
 from discord.ext.commands import Cog, command, Bot
-from lavalink import Client, NodeError, format_time, add_event_hook, TrackEndEvent
+from lavalink import Client, NodeError, format_time, add_event_hook, TrackEndEvent, AudioTrack
 
 from music_funcs import *
 
@@ -145,7 +145,7 @@ class Music(Cog):
             else:
                 return await ctx.send(f'Использование: {ctx.prefix}[p|play] <ссылка/название>')
         res = await get_track(self.spotify, player, query, self.bot.config)
-        if not isinstance(res, (Track, Playlist, dict, list)):
+        if not isinstance(res, (AudioTrack, Track, Playlist, dict, list)):
             if isinstance(res, Embed):
                 return await ctx.send(embed=res)
             return await ctx.send(res)
@@ -154,6 +154,10 @@ class Music(Cog):
         if isinstance(res, dict):
             embed.title = '✅Трек добавлен'
             embed.description = f'[{res["info"]["title"]}]({res["info"]["uri"]})'
+            player.add(requester=ctx.author.id, track=res, index=index)
+        elif isinstance(res, AudioTrack):
+            embed.title = '✅Трек добавлен'
+            embed.description = f'[{res.author} - {res.title}]({res.uri})'
             player.add(requester=ctx.author.id, track=res, index=index)
         elif isinstance(res, Track):
             track = await res.get_track(self.spotify, player, self.bot.config)

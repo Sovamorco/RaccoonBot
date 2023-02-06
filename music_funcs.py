@@ -241,13 +241,13 @@ async def get_track(spotify, player, query, config, force_first=False):
     query = query.strip('<>')
     spm = spotify_rx.match(query)
     if spm:
-        typ = spm.group(1)
+        _type = spm.group(1)
         iden = spm.group(2)
-        if typ == 'track':
+        if _type == 'track':
             return await spotify.get_spotify_track(iden)
-        elif typ == 'album':
+        elif _type == 'album':
             return await spotify.get_spotify_album(iden)
-        elif typ == 'playlist':
+        elif _type == 'playlist':
             return await spotify.get_spotify_playlist(iden)
     is_url = bool(url_rx.match(query))
     if is_url:
