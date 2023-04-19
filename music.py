@@ -77,7 +77,7 @@ class Music(Cog):
             lc = Client(bot.user.id, player=Player)
             addr = self.bot.config['lavalink']['address']
             pw = self.bot.config['lavalink']['password']
-            lc.add_node(addr, 2333, pw, 'de', 'default-node', reconnect_attempts=-1)
+            lc.add_node(addr, 2333, pw, 'de', 'default-node')
             self.bot.lavalink = lc
 
         add_event_hook(update_queues, event=TrackEndEvent)
