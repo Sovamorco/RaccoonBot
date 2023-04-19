@@ -77,7 +77,7 @@ class Music(Cog):
             lc = Client(bot.user.id, player=Player)
             addr = self.bot.config['lavalink']['address']
             pw = self.bot.config['lavalink']['password']
-            self.bot.lavalink_node = Node(addr, 2333, pw, 'de', 'default-node', 600, 'default-node', 3)
+            self.bot.lavalink_node = Node(addr, 2333, pw, 'de', 'default-node', 600, 'default-node', -1)
             lc.node_manager.nodes.append(self.bot.lavalink_node)
             self.bot.lavalink = lc
 
