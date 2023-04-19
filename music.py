@@ -117,7 +117,10 @@ class Music(Cog):
 
     async def get_player(self, guild_id):
         try:
-            return self.lavalink.player_manager.create(guild_id)
+            player = self.lavalink.player_manager.create(guild_id)
+            if player.node.available:
+                return player
+            raise NodeException
         except NodeException:
             for node in self.lavalink.node_manager.nodes:
                 self.lavalink.node_manager.remove_node(node)
