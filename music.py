@@ -16,6 +16,18 @@ class LavalinkVoiceClient(VoiceClient):
         self.client = client
         self.channel = channel
         self.lavalink = self.client.lavalink
+        # noinspection PyUnresolvedReferences
+        self.node_settings = self.client.node_settings
+
+    async def get_player(self, guild_id):
+        try:
+            return self.lavalink.player_manager.create(guild_id)
+        except NodeException:
+            for node in self.lavalink.node_manager.nodes:
+                self.lavalink.node_manager.remove_node(node)
+            self.lavalink.add_node(*self.node_settings)
+            await sleep(1)
+            return self.lavalink.player_manager.create(guild_id)
 
     async def on_voice_server_update(self, data):
         # the data needs to be transformed before being handed down to
@@ -42,7 +54,7 @@ class LavalinkVoiceClient(VoiceClient):
         if it doesn't exist yet.
         """
         # ensure there is a player_manager when creating a new voice_client
-        self.lavalink.player_manager.create(guild_id=self.channel.guild.id)
+        await self.get_player(self.channel.guild.id)
         await self.channel.guild.change_voice_state(channel=self.channel, self_mute=self_mute, self_deaf=self_deaf)
 
     async def disconnect(self, *, force: bool = False) -> None:
@@ -50,7 +62,7 @@ class LavalinkVoiceClient(VoiceClient):
         Handles the disconnect.
         Cleans up running player and leaves the voice client.
         """
-        player = self.lavalink.player_manager.get(self.channel.guild.id)
+        player = await self.get_player(self.channel.guild.id)
 
         # no need to disconnect if we are not connected
         if not force and not player.is_connected:
@@ -77,8 +89,9 @@ class Music(Cog):
             lc = Client(bot.user.id, player=Player)
             addr = self.bot.config['lavalink']['address']
             pw = self.bot.config['lavalink']['password']
-            lc.add_node(addr, 2333, pw, 'de', 'default-node')
-            self.bot.lavalink = lc
+            self.node_settings = self.bot.node_settings = (addr, 2333, pw, 'de', 'default-node')
+            lc.add_node(*self.node_settings)
+            self.lavalink = self.bot.lavalink = lc
 
         add_event_hook(update_queues, event=TrackEndEvent)
 
@@ -93,7 +106,7 @@ class Music(Cog):
             print('Trying to connect to lavalink')
             try:
                 for saved in saved_settings:
-                    player = self.bot.lavalink.player_manager.create(saved['id'])
+                    player = await self.get_player(saved['id'])
                     await player.set_volume(saved['volume'])
                     player.shuffle = saved['shuffle']
             except NodeException:
@@ -102,8 +115,18 @@ class Music(Cog):
                 print('Initialized lavalink')
                 break
 
+    async def get_player(self, guild_id):
+        try:
+            return self.lavalink.player_manager.create(guild_id)
+        except NodeException:
+            for node in self.lavalink.node_manager.nodes:
+                self.lavalink.node_manager.remove_node(node)
+            self.lavalink.add_node(*self.node_settings)
+            await sleep(1)
+            return self.lavalink.player_manager.create(guild_id)
+
     async def stop_playing(self, guild_id):
-        player = self.bot.lavalink.player_manager.get(guild_id)
+        player = await self.get_player(guild_id)
         player.queue.clear()
         await player.stop()
         guild = self.bot.get_guild(guild_id)
@@ -125,7 +148,7 @@ class Music(Cog):
 
     def cog_unload(self):
         # noinspection PyProtectedMember
-        self.bot.lavalink._event_hooks.clear()
+        self.lavalink._event_hooks.clear()
 
     async def cog_before_invoke(self, ctx):
         guild_check = ctx.guild is not None
@@ -134,7 +157,7 @@ class Music(Cog):
         return guild_check
 
     async def _play(self, ctx, query, force):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        player = await self.get_player(ctx.guild.id)
         index = 0 if force else None
         if not query:
             if player.paused:
@@ -210,14 +233,14 @@ class Music(Cog):
 
     @command(help='Команда для перемотки музыки', usage='seek <время в секундах>')
     async def seek(self, ctx, *, seconds: int):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        player = await self.get_player(ctx.guild.id)
         track_time = player.position + (seconds * 1000)
         await player.seek(track_time)
         await ctx.message.add_reaction('👌')
 
     @command(help='Команда для пропуска трека')
     async def skip(self, ctx):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        player = await self.get_player(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет')
         await player.skip()
@@ -236,7 +259,7 @@ class Music(Cog):
 
     @command(help='Команда для очистки очереди плеера')
     async def clear(self, ctx):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        player = await self.get_player(ctx.guild.id)
         if not player.queue:
             return await ctx.send('Очередь пустая')
         player.queue.clear()
@@ -244,7 +267,7 @@ class Music(Cog):
 
     @command(aliases=['n', 'np', 'playing', 'current'], help='Команда для отображения текущего трека')
     async def now(self, ctx):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        player = await self.get_player(ctx.guild.id)
         if not player.current:
             return await ctx.send('Ничего не играет')
         position = format_time(player.position)
@@ -258,7 +281,7 @@ class Music(Cog):
 
     @command(aliases=['nl', 'npl', 'cl'], help='Команда для отображения текста текущего трека')
     async def currentlyrics(self, ctx):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        player = await self.get_player(ctx.guild.id)
         if not player.current:
             return await ctx.send('Ничего не играет')
         title = player.current.title
@@ -301,7 +324,7 @@ class Music(Cog):
 
     @command(aliases=['q', 'list'], help='Команда для отображения очереди воспроизведения')
     async def queue(self, ctx):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        player = await self.get_player(ctx.guild.id)
         if not player.queue:
             return await ctx.send('Очередь пустая')
         queue = Queue(player, ctx)
@@ -311,7 +334,7 @@ class Music(Cog):
     @command(aliases=['resume'],
              help='Команда для приостановки или продолжения поспроизведения воспроизведения')
     async def pause(self, ctx):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        player = await self.get_player(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет')
         await player.set_pause(not player.paused)
@@ -320,7 +343,7 @@ class Music(Cog):
     @command(aliases=['vol'], help='Команда для изменения громкости плеера',
              usage='volume <громкость(1-1000)>')
     async def volume(self, ctx, volume: int = None):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        player = await self.get_player(ctx.guild.id)
         if volume is None:
             return await ctx.send(f'🔈 | {player.volume}%')
         await player.set_volume(volume)
@@ -332,7 +355,7 @@ class Music(Cog):
 
     @command(help='Команда для включения/выключения перемешивания очереди')
     async def shuffle(self, ctx):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        player = await self.get_player(ctx.guild.id)
         player.shuffle = not player.shuffle
         await ctx.send('🔀 | Перемешивание ' + ('включено' if player.shuffle else 'выключено'))
         await self.bot.sql_client.sql_req(
@@ -342,7 +365,7 @@ class Music(Cog):
 
     @command(help='Команда для перемешивания текущей очереди', aliases=['qs'])
     async def qshuffle(self, ctx):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        player = await self.get_player(ctx.guild.id)
         if not player.queue:
             return await ctx.send('Очередь пустая')
         shuffle(player.queue)
@@ -350,7 +373,7 @@ class Music(Cog):
 
     @command(aliases=['loop'], help='Команда для включения/выключения зацикливания очереди')
     async def repeat(self, ctx):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        player = await self.get_player(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет')
         player.repeat = not player.repeat
@@ -358,7 +381,7 @@ class Music(Cog):
 
     @command(help='Команда для удаления трека из очереди', usage='remove <индекс>')
     async def remove(self, ctx, index: int):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        player = await self.get_player(ctx.guild.id)
         if not player.queue:
             return await ctx.send('Очередь пустая')
         if index > len(player.queue) or index < 1:
@@ -373,7 +396,7 @@ class Music(Cog):
         await ctx.message.add_reaction('👌')
 
     async def ensure_voice(self, ctx):
-        player = self.bot.lavalink.player_manager.create(ctx.guild.id)
+        player = await self.get_player(ctx.guild.id)
         should_connect = ctx.command.name in ('play', 'force', 'join', 'gachibass', 'move')
         ignored = ctx.command.name in ('volume', 'shuffle', 'delete', 'queue', 'now')
         if ignored:
