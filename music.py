@@ -5,7 +5,7 @@ from textwrap import wrap
 from bs4 import BeautifulSoup
 from discord import VoiceClient
 from discord.ext.commands import Cog, command, Bot
-from lavalink import Client, format_time, add_event_hook, TrackEndEvent, NodeException
+from lavalink import Client, format_time, add_event_hook, TrackEndEvent, Node
 
 from music_funcs import *
 
@@ -77,7 +77,8 @@ class Music(Cog):
             lc = Client(bot.user.id, player=Player)
             addr = self.bot.config['lavalink']['address']
             pw = self.bot.config['lavalink']['password']
-            lc.add_node(addr, 2333, pw, 'de', 'default-node', reconnect_attempts=-1)
+            self.bot.lavalink_node = Node(addr, 2333, pw, 'de', 'default-node', 600, 'default-node', -1)
+            lc.node_manager.nodes.append(self.bot.lavalink_node)
             self.bot.lavalink = lc
 
         add_event_hook(update_queues, event=TrackEndEvent)
@@ -85,22 +86,18 @@ class Music(Cog):
     async def initialize(self):
         print('Initializing spotify')
         self.spotify = await init_spotify(self.bot.config, self.bot.loop)
+        print('Trying to connect to lavalink')
+        # noinspection PyProtectedMember
+        await self.bot.lavalink_node._ws.connect()
         print('Initializing lavalink')
         saved_settings = await self.bot.sql_client.sql_req(
             'SELECT id, volume, shuffle FROM server_data', fetch_all=True
         )
-        while True:
-            print('Trying to connect to lavalink')
-            try:
-                for saved in saved_settings:
-                    player = self.bot.lavalink.player_manager.create(saved['id'])
-                    await player.set_volume(saved['volume'])
-                    player.shuffle = saved['shuffle']
-            except NodeException:
-                await sleep(1)
-            else:
-                print('Initialized lavalink')
-                break
+        for saved in saved_settings:
+            player = self.bot.lavalink.player_manager.create(saved['id'])
+            await player.set_volume(saved['volume'])
+            player.shuffle = saved['shuffle']
+        print('Initialized lavalink')
 
     async def stop_playing(self, guild_id):
         player = self.bot.lavalink.player_manager.get(guild_id)
@@ -373,6 +370,9 @@ class Music(Cog):
         await ctx.message.add_reaction('👌')
 
     async def ensure_voice(self, ctx):
+        if not self.bot.lavalink_node.available:
+            # noinspection PyProtectedMember
+            await self.bot.lavalink_node._ws.connect()
         player = self.bot.lavalink.player_manager.create(ctx.guild.id)
         should_connect = ctx.command.name in ('play', 'force', 'join', 'gachibass', 'move')
         ignored = ctx.command.name in ('volume', 'shuffle', 'delete', 'queue', 'now')
