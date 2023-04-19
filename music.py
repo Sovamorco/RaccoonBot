@@ -87,9 +87,8 @@ class Music(Cog):
         print('Initializing spotify')
         self.spotify = await init_spotify(self.bot.config, self.bot.loop)
         print('Trying to connect to lavalink')
-        if not self.bot.lavalink_node.available:
-            # noinspection PyProtectedMember
-            await self.bot.lavalink_node._ws.connect()
+        # noinspection PyProtectedMember
+        await self.bot.lavalink_node._ws.connect()
         print('Initializing lavalink')
         saved_settings = await self.bot.sql_client.sql_req(
             'SELECT id, volume, shuffle FROM server_data', fetch_all=True
