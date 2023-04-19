@@ -5,7 +5,7 @@ from textwrap import wrap
 from bs4 import BeautifulSoup
 from discord import VoiceClient
 from discord.ext.commands import Cog, command, Bot
-from lavalink import Client, format_time, add_event_hook, TrackEndEvent, NodeException
+from lavalink import Client, format_time, add_event_hook, TrackEndEvent, NodeException, Node
 
 from music_funcs import *
 
@@ -75,9 +75,7 @@ class Music(Cog):
 
         if not hasattr(bot, 'lavalink'):
             lc = Client(bot.user.id, player=Player)
-            addr = self.bot.config['lavalink']['address']
-            pw = self.bot.config['lavalink']['password']
-            lc.add_node(addr, 2333, pw, 'de', 'default-node', reconnect_attempts=-1)
+            # lc.add_node()
             self.bot.lavalink = lc
 
         add_event_hook(update_queues, event=TrackEndEvent)
@@ -86,6 +84,12 @@ class Music(Cog):
         print('Initializing spotify')
         self.spotify = await init_spotify(self.bot.config, self.bot.loop)
         print('Initializing lavalink')
+        addr = self.bot.config['lavalink']['address']
+        pw = self.bot.config['lavalink']['password']
+        node = Node(self.bot.lavalink.node_manager, addr, 2333, pw, 'de', 'default-node', 60, 'default-node', reconnect_attempts=-1)
+        # noinspection PyProtectedMember
+        await node._ws.connect()
+        self.bot.lavalink.nodes.append(node)
         saved_settings = await self.bot.sql_client.sql_req(
             'SELECT id, volume, shuffle FROM server_data', fetch_all=True
         )
@@ -374,6 +378,9 @@ class Music(Cog):
 
     async def ensure_voice(self, ctx):
         player = self.bot.lavalink.player_manager.create(ctx.guild.id)
+        if not player.node.available:
+            # noinspection PyProtectedMember
+            await player.node._ws.connect()
         should_connect = ctx.command.name in ('play', 'force', 'join', 'gachibass', 'move')
         ignored = ctx.command.name in ('volume', 'shuffle', 'delete', 'queue', 'now')
         if ignored:
