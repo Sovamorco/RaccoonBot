@@ -9,9 +9,8 @@ discord:
   token: VAULT->dev/raccoonbot/alpha_token
   personal_id: stub
 
-lavalink:
-  address: localhost
-  password: local
+orca:
+  address: localhost:8590
 
 genius_token: stub
 gachi_things: []

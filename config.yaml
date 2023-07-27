@@ -8,7 +8,8 @@ discord:
   token: VAULT->raccoonbot/token
   personal_id: VAULT->raccoonbot/personal_id
 
-lavalink: VAULT->raccoonbot/lavalink
+orca:
+  address: orca:8590
 
 genius_token: VAULT->raccoonbot/genius_token
 gachi_things: VAULT->raccoonbot/gachi_things

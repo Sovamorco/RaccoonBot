@@ -1,291 +1,14 @@
-from asyncio import get_event_loop, gather
-from base64 import b64encode
 from math import ceil
-from time import time
 
 import regex as re
-from aiohttp import ClientSession
 from discord import Embed, Color
 from discord.ext.commands import CommandInvokeError
-from lavalink import DefaultPlayer
 
-from utils import sform
+from orca_pb2 import TrackData
 
-agent = 'KateMobileAndroid/52.1 lite-445 (Android 4.4.2; SDK 19; x86; unknown Android SDK built for x86; en)'
-
-vk_album_rx = re.compile(r'(?:audio_playlist|album\/|playlist\/)(-?[0-9]+)_([0-9]+)(?:(?:%2f|%2F|\/|_)([a-z0-9]+))?')
-vk_pers_rx = re.compile(r'audios(-?[0-9]+)')
-spotify_rx = re.compile(r'(?:spotify:|(?:https?:\/\/)?(?:www\.)?open\.spotify\.com\/)(playlist|track|album)(?:\:|\/)([a-zA-Z0-9]+)(.*)$')
+spotify_rx = re.compile(
+    r'(?:spotify:|(?:https?:\/\/)?(?:www\.)?open\.spotify\.com\/)(playlist|track|album)(?:\:|\/)([a-zA-Z0-9]+)(.*)$')
 url_rx = re.compile(r'https?://(?:www\.)?.+')
-
-
-class Track:
-    def __init__(self, author, title, url=None, show_url=None):
-        self.author = author
-        self.title = title
-        self.url = url
-        self._show_url = show_url
-
-    def __str__(self):
-        return f'{self.author} - {self.title}'
-
-    @property
-    def show_url(self):
-        return self._show_url or self.url
-
-    @property
-    def uri(self):
-        return self.url or str(self)
-
-    async def get_track(self, spotify, player, config):
-        track = await get_track(spotify, player, self.uri, config, True)
-        if not isinstance(track, dict):
-            return
-        track['info']['author'] = self.author
-        track['info']['title'] = str(self)
-        track['info']['uri'] = self.show_url
-        return track
-
-
-class Playlist:
-    def __init__(self, title, tracks):
-        self.title = title
-        self.tracks = tracks
-        self.message_update_frequency = 2  # seconds
-
-    def __str__(self):
-        return self.title
-
-    @staticmethod
-    def get_embed(msg, progress, total):
-        old = msg.embeds[0]
-        old.description = f'Загрузка: {progress}/{total}'
-        return old
-
-    async def add(self, spotify, player, requester, msg, config, force=False):
-        if not self.tracks:
-            return
-        simple = isinstance(self.tracks[0], dict)
-        tracks = reversed(self.tracks) if force else self.tracks
-        index = 0 if force else None
-        await msg.edit(embed=self.get_embed(msg, 0, len(tracks)))
-        loaded = 0
-        last_update = time()
-        message_update_lock = False
-
-        async def load_track(track):
-            nonlocal loaded, last_update, message_update_lock
-            loaded_track = await track.get_track(spotify, player, config)
-            loaded += 1
-            if not message_update_lock and time() - last_update > self.message_update_frequency:
-                message_update_lock = True
-                await msg.edit(embed=self.get_embed(msg, loaded + 1, len(tracks)))
-                last_update = time()
-                message_update_lock = False
-            return loaded_track
-
-        if simple:
-            # make it into a generator for convenience
-            loaded_tracks = (track for track in tracks)
-        else:
-            loaded_tracks = filter(None, await gather(*[
-                load_track(track) for track in tracks
-            ]))
-
-        try:
-            player.add(requester=requester, track=next(loaded_tracks), index=index)
-        except StopIteration:
-            return
-        if not player.is_playing:
-            await player.play()
-        for track in loaded_tracks:
-            player.add(requester=requester, track=track, index=index)
-
-
-async def get_vk_album(url, config):
-    album = vk_album_rx.search(url)
-    if not album:
-        return Embed(color=Color.blue(), title='❌Плейлист не найден')
-    headers = {
-        'User-Agent': agent
-    }
-    params = {
-        'access_token': config['vk_personal_audio_token'],
-        'v': '5.999',
-        'owner_id': album.group(1),
-        'playlist_id': album.group(2)
-    }
-    if album.group(3):
-        params['access_key'] = album.group(3)
-    async with ClientSession() as client:
-        res = await client.get('https://api.vk.com/method/audio.get', headers=headers, params=params)
-        playlist = await client.get('https://api.vk.com/method/audio.getPlaylistById', headers=headers, params=params)
-        res = await res.json()
-        playlist = await playlist.json()
-    if 'error' in res.keys():
-        if res['error']['error_code'] == 201:
-            return Embed(color=Color.blue(), title='❌Нет доступа к аудио пользователя')
-        elif res['error']['error_code'] == 15:
-            return Embed(color=Color.blue(), title='❌Нет доступа к аудио сообщества')
-        else:
-            print(res)
-            return Embed(color=Color.blue(), title='❌Ошибка при добавлении плейлиста')
-    res = res['response']
-    playlist = playlist['response']
-    album_url = f'https://vk.com/music/album/{album.group(1)}_{album.group(2)}'
-    if album.group(3):
-        album_url += f'_{album.group(3)}'
-    return Playlist(playlist['title'],
-                    [Track(item['artist'], item['title'], item['url'], album_url) for item in res['items'] if item['url']])
-
-
-async def get_vk_personal(url, config):
-    user = vk_pers_rx.search(url)
-    if not user:
-        return Embed(color=Color.blue(), title='❌Плейлист не найден')
-    headers = {
-        'User-Agent': agent
-    }
-    params = {
-        'access_token': config['vk_personal_audio_token'],
-        'v': '5.999',
-        'owner_id': user.group(1),
-        'need_user': 1
-    }
-    async with ClientSession() as client:
-        ans = await client.get('https://api.vk.com/method/audio.get', headers=headers, params=params)
-        res = await ans.json()
-    if 'error' in res.keys():
-        if res['error']['error_code'] == 201:
-            return Embed(color=Color.blue(), title='❌Нет доступа к аудио пользователя')
-        else:
-            return Embed(color=Color.blue(), title='❌Ошибка при добавлении плейлиста')
-    playlist = res['response']
-    items = playlist['items']
-    user_info = items.pop(0)
-    audios_url = f'https://vk.com/audios/{user.group(1)}'
-    return Playlist(f'Аудиозаписи {user_info["name_gen"]}',
-                    [Track(item['artist'], item['title'], item['url'], audios_url) for item in items if item['url']])
-
-
-class Spotify:
-    """
-    Класс, нагло спизженный из Just-Some-Bots/MusicBot
-    """
-    OAUTH_TOKEN_URL = 'https://accounts.spotify.com/api/token'
-    API_BASE = 'https://api.spotify.com/v1/'
-
-    def __init__(self, client_id, client_secret, loop):
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.aiosession = ClientSession()
-        self.loop = loop
-
-        self.token = None
-
-    async def init(self):
-        await self.get_token()
-
-    @staticmethod
-    def _make_token_auth(client_id, client_secret):
-        auth_header = b64encode((client_id + ':' + client_secret).encode('ascii'))
-        return {'Authorization': 'Basic %s' % auth_header.decode('ascii')}
-
-    async def get_track(self, uri):
-        return await self.make_spotify_req(self.API_BASE + f'tracks/{uri}')
-
-    async def get_album(self, uri):
-        return await self.make_spotify_req(self.API_BASE + f'albums/{uri}')
-
-    async def get_playlist(self, uri):
-        return await self.make_spotify_req(self.API_BASE + f'playlists/{uri}')
-
-    async def get_playlist_tracks(self, uri):
-        return await self.make_spotify_req(self.API_BASE + f'playlists/{uri}/tracks')
-
-    async def make_spotify_req(self, url):
-        token = await self.get_token()
-        return await self.make_get(url, headers={'Authorization': f'Bearer {token}'})
-
-    async def make_get(self, url, headers=None):
-        async with self.aiosession.get(url, headers=headers) as r:
-            return await r.json()
-
-    async def make_post(self, url, payload, headers=None):
-        async with self.aiosession.post(url, data=payload, headers=headers, timeout=10) as r:
-            return await r.json()
-
-    async def get_token(self):
-        if self.token and not await self.check_token(self.token):
-            return self.token['access_token']
-
-        token = await self.request_token()
-        token['expires_at'] = int(time()) + token['expires_in']
-        self.token = token
-        return self.token['access_token']
-
-    @staticmethod
-    async def check_token(token):
-        now = int(time())
-        return token['expires_at'] - now < 60
-
-    async def request_token(self):
-        payload = {'grant_type': 'client_credentials'}
-        headers = self._make_token_auth(self.client_id, self.client_secret)
-        r = await self.make_post(self.OAUTH_TOKEN_URL, payload=payload, headers=headers)
-        return r
-
-    async def get_spotify_track(self, uri):
-        res = await self.get_track(uri)
-        return Track(res["artists"][0]["name"], res["name"], show_url=res['external_urls']['spotify'])
-
-    async def get_spotify_album(self, uri):
-        res = await self.get_album(uri)
-        tracks = [Track(item['artists'][0]['name'], item['name'], show_url=item['external_urls']['spotify']) for item in res['tracks']['items']]
-        return Playlist(res['name'], tracks)
-
-    async def get_spotify_playlist(self, uri):
-        res = []
-        r = await self.get_playlist_tracks(uri)
-        while True:
-            res.extend(r['items'])
-            if r['next'] is None:
-                break
-            r = await self.make_spotify_req(r['next'])
-        tracks = [Track(item['track']['artists'][0]['name'], item['track']['name'], show_url=item['track']['external_urls']['spotify']) for item in res if not item['is_local']]
-        playlist = await self.get_playlist(uri)
-        return Playlist(playlist['name'], tracks)
-
-
-async def get_track(spotify, player, query, config, force_first=False):
-    query = query.strip('<>')
-    spm = spotify_rx.match(query)
-    if spm:
-        _type = spm.group(1)
-        iden = spm.group(2)
-        if _type == 'track':
-            return await spotify.get_spotify_track(iden)
-        elif _type == 'album':
-            return await spotify.get_spotify_album(iden)
-        elif _type == 'playlist':
-            return await spotify.get_spotify_playlist(iden)
-    is_url = bool(url_rx.match(query))
-    if is_url:
-        if vk_album_rx.search(query):
-            return await get_vk_album(query, config)
-        elif vk_pers_rx.search(query):
-            return await get_vk_personal(query, config)
-    else:
-        query = f'ytsearch:{query}'
-    results = await player.node.get_tracks(query)
-    if not results or not results['tracks']:
-        return 'Ничего не найдено'
-    if results['loadType'] == 'PLAYLIST_LOADED':
-        return Playlist(results['playlistInfo']['name'], results['tracks'])
-    if is_url or force_first or len(results['tracks']) == 1:
-        return results['tracks'][0]
-    return results['tracks']
-
 
 embed_colors = {
     'youtube.com': Color.red(),
@@ -310,6 +33,13 @@ def get_embed_color(query):
     return Color.red()
 
 
+def format_time(t):
+    hours, remainder = divmod(t, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    return '%02d:%02d:%02d' % (hours, minutes, seconds)
+
+
 class MusicCommandError(CommandInvokeError):
     pass
 
@@ -318,133 +48,33 @@ queues = []
 
 
 class Queue:
-    def __init__(self, player, context, items_per_page=10):
-        self.player = player
-        self.context = context
-        self.message = None
-        self.page = 0
-        self._items_per_page = items_per_page
-
-    async def send(self):
-        self.message = await self.context.send(embed=self.embed)
-        await self.update_emojis()
-
-    @property
-    def pages(self):
-        return ceil(len(self.player.queue) / self._items_per_page)
+    def __init__(self, current: TrackData, tracks: list[TrackData], looping: bool, page: int, total: int):
+        self.current = current
+        self.tracks = tracks
+        self.looping = looping
+        self.page = page
+        self.start = (page - 1) * 10 + 1
+        self.total = total
 
     @property
     def color(self):
-        if self.player.current:
-            return get_embed_color(self.player.current.uri)
-        return Color.dark_purple()
+        return get_embed_color(self.current.displayURL)
 
     @property
     def _to_embed_content(self):
-        if self.player.current:
-            result = f'\n**`Сейчас играет: `[`{self.player.current.title}`]({self.player.current.uri})**\n\n\n'
+        if self.current.live:
+            poss = '🔴 LIVE'
         else:
-            result = ''
-        for index, track in enumerate(self.player.queue[self.page * 10:(self.page + 1) * 10], start=self.page * 10):
-            result += f'`{index + 1}.` [**{track.title}**]({track.uri})\n'
+            poss = f'{format_time(self.current.position.ToSeconds())}/{format_time(self.current.duration.ToSeconds())}'
+        result = f'\n`Сейчас играет:` [**{self.current.title}**]({self.current.displayURL}) ({poss})\n\n\n'
+        for index, track in enumerate(self.tracks):
+            result += f'`{self.start + index}.` [**{track.title}**]({track.displayURL})\n'
         return result
 
     @property
     def embed(self):
-        content = self._to_embed_content
-        embed = Embed(color=self.color, description=f'**{len(self.player.queue)} {sform(len(self.player.queue), "трек")}**\n\n{content}')
+        embed = Embed(color=self.color, description=self._to_embed_content)
+        embed.set_footer(text=f'Страница: {self.page}/{ceil((self.total - 1) / 10)}\n'
+                              f'Всего треков: {self.total}\n'
+                              f'Повторение: {"вкл." if self.looping else "выкл."}')
         return embed
-
-    @property
-    def emojis_list(self):
-        result = ['❌']
-        if self.page > 0:
-            result.extend(['⏮', '◀'])
-        if self.page < self.pages - 1:
-            result.extend(['▶', '⏭'])
-        return result
-
-    async def react(self, reaction):
-        emoji = str(reaction)
-        if emoji not in self.emojis_list:
-            return await reaction.clear()
-        elif emoji == '❌':
-            return await self.delete()
-        elif emoji == '⏮':
-            self.page = 0
-        elif emoji == '◀':
-            self.page -= 1
-        elif emoji == '▶':
-            self.page += 1
-        elif emoji == '⏭':
-            self.page = self.pages - 1
-        return await self.update()
-
-    async def update_message(self):
-        self.message = await self.context.fetch_message(self.message.id)
-
-    @property
-    def message_emojis(self):
-        return [str(reaction) for reaction in self.message.reactions]
-
-    async def clear_reactions_but_from_bot(self):
-        await self.update_message()
-        for reaction in self.message.reactions:
-            if reaction.count > 1:
-                async for user in reaction.users():
-                    if user != self.context.bot.user:
-                        await reaction.remove(user)
-
-    async def update_emojis(self):
-        await self.update_message()
-        for emoji in self.message_emojis:
-            if emoji not in self.emojis_list:
-                await self.message.clear_reaction(emoji)
-        for emoji in self.emojis_list:
-            if emoji not in self.message_emojis:
-                await self.message.add_reaction(emoji)
-        await self.clear_reactions_but_from_bot()
-
-    async def delete(self):
-        queues.remove(self)
-        return await self.message.delete()
-
-    async def update(self):
-        if self.pages == 0:
-            return await self.delete()
-        if self.page >= self.pages:
-            self.page = self.pages - 1
-        await self.message.edit(embed=self.embed)
-        await self.update_emojis()
-
-
-async def update_queues(event):
-    if isinstance(event, Player):
-        player = event
-    else:
-        player = event.player
-    for queue in queues:
-        if queue.player == player:
-            await queue.update()
-
-
-class Player(DefaultPlayer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.event_loop = get_event_loop()
-
-    async def play(self, *args, **kwargs):
-        await super().play(*args, **kwargs)
-        await update_queues(self)
-
-    def add(self, *args, **kwargs):
-        super().add(*args, **kwargs)
-        self.event_loop.create_task(update_queues(self))
-
-
-async def init_spotify(config, loop):
-    if config.get('spotify') is None:
-        return
-    spotify = Spotify(config['spotify']['client_id'], config['spotify']['client_secret'], loop)
-    await spotify.init()
-    return spotify
