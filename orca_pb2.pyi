@@ -76,14 +76,16 @@ class GetTracksRequest(_message.Message):
     def __init__(self, guildID: _Optional[str] = ..., start: _Optional[int] = ..., end: _Optional[int] = ...) -> None: ...
 
 class GetTracksReply(_message.Message):
-    __slots__ = ["tracks", "totalTracks", "looping"]
+    __slots__ = ["tracks", "totalTracks", "looping", "totalDuration"]
     TRACKS_FIELD_NUMBER: _ClassVar[int]
     TOTALTRACKS_FIELD_NUMBER: _ClassVar[int]
     LOOPING_FIELD_NUMBER: _ClassVar[int]
+    TOTALDURATION_FIELD_NUMBER: _ClassVar[int]
     tracks: _containers.RepeatedCompositeFieldContainer[TrackData]
     totalTracks: int
     looping: bool
-    def __init__(self, tracks: _Optional[_Iterable[_Union[TrackData, _Mapping]]] = ..., totalTracks: _Optional[int] = ..., looping: bool = ...) -> None: ...
+    totalDuration: _duration_pb2.Duration
+    def __init__(self, tracks: _Optional[_Iterable[_Union[TrackData, _Mapping]]] = ..., totalTracks: _Optional[int] = ..., looping: bool = ..., totalDuration: _Optional[_Union[_duration_pb2.Duration, _Mapping]] = ...) -> None: ...
 
 class RemoveRequest(_message.Message):
     __slots__ = ["guildID", "position"]
