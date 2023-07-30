@@ -1,3 +1,6 @@
+from collections import ChainMap
+from typing import Optional
+
 import grpc
 from discord.ext.commands import Cog, command, Bot
 from discord.ext.commands import Context
@@ -5,6 +8,8 @@ from discord.ext.commands import Context
 from google.protobuf.duration_pb2 import Duration
 from grpc.aio import UnaryUnaryClientInterceptor, UnaryStreamClientInterceptor, StreamStreamClientInterceptor, \
     StreamUnaryClientInterceptor
+from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadCancelled
 
 from music_funcs import *
 from orca_pb2 import PlayRequest, PlayReply, GuildOnlyRequest, SeekRequest, \
@@ -70,7 +75,81 @@ class Music(Cog):
                 if queue.message.id == reaction.message.id:
                     return await queue.react(reaction)
 
+    async def _do_search(self, ctx: Context, query: str) -> Optional[str]:
+        tracks = []
+
+        def match_filter(info_dict, *_, **__):
+            nonlocal tracks
+
+            if not isinstance(info_dict, ChainMap):
+                return None
+
+            if info_dict.get('duration') is None or 'youtube.com/watch?v' not in info_dict.get('url', ''):
+                return 'not a video'
+
+            tracks.append(info_dict)
+
+            if len(tracks) >= 10:
+                raise DownloadCancelled('matched 10')
+
+            return None
+
+        ytdl = YoutubeDL(params={
+            'extract_flat': True,
+            'match_filter': match_filter,
+            'lazy_playlist': True,
+            'quiet': True,
+        })
+
+        try:
+            ytdl.extract_info(f'ytsearch1000:{query}', download=False)
+        except DownloadCancelled:
+            pass
+
+        embed_value = ''
+
+        for i, track in enumerate(tracks):
+            embed_value += '{}: **{}** ({})\n'.format(
+                i + 1,
+                track['title'],
+                format_time(track['duration']),
+                )
+
+        choice_embed = Embed(title='Выберите трек', description=embed_value, color=Color.red())
+        choice_embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
+        choice_msg = await ctx.send(embed=choice_embed, delete_after=30)
+        canc = False
+
+        prefixes = await self.bot.get_prefix(ctx.message)
+
+        def verify(m):
+            nonlocal canc
+            if m.content.isdigit():
+                return 0 <= int(m.content) <= min(len(tracks),
+                                                  10) and m.channel == ctx.channel and m.author == ctx.author
+            canc = m.channel == ctx.channel and m.author == ctx.author and any(
+                m.content.startswith(prefix) and len(m.content) > len(prefix) for prefix in prefixes)
+            return canc
+
+        msg = await self.bot.wait_for('message', check=verify, timeout=30)
+        if canc or int(msg.content) == 0:
+            await choice_msg.delete()
+            return None
+
+        track = tracks[int(msg.content) - 1]
+        await choice_msg.delete()
+
+        return track['url']
+
     async def _play(self, ctx: Context, query, pos=None):
+        if ctx.author.voice is None:
+            return await ctx.send('Не в голосовом канале')
+
+        if not url_rx.match(query):
+            query = await self._do_search(ctx, query)
+            if query is None:
+                return
+
         req = PlayRequest(
             guildID=str(ctx.guild.id),
             channelID=str(ctx.author.voice.channel.id),
