@@ -212,7 +212,7 @@ class Music(Cog):
             start=1 + 10 * (page - 1),
             end=1 + 10 * page,
         ))
-        q = Queue(current, res.tracks, res.looping, page, res.totalTracks, res.totalDuration.ToSeconds())
+        q = Queue(current, res.tracks, res.looping, page, res.totalTracks, res.remaining.ToSeconds())
         return await ctx.send(embed=q.embed)
 
     @command(aliases=['r', 'delete'], usage='remove <номер трека>',

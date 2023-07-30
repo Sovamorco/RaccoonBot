@@ -48,14 +48,14 @@ queues = []
 
 
 class Queue:
-    def __init__(self, current: TrackData, tracks: list[TrackData], looping: bool, page: int, total: int, total_duration: int):
+    def __init__(self, current: TrackData, tracks: list[TrackData], looping: bool, page: int, total: int, remaining: int):
         self.current = current
         self.tracks = tracks
         self.looping = looping
         self.page = page
         self.start = (page - 1) * 10 + 1
         self.total = total
-        self.total_duration = total_duration
+        self.remaining = remaining
 
     @property
     def color(self):
@@ -74,12 +74,8 @@ class Queue:
 
     @property
     def embed(self):
-        duration_left = self.total_duration
-        if not self.looping:
-            duration_left -= self.current.position.ToSeconds()
-
         embed = Embed(color=self.color, description=self._to_embed_content)
         embed.set_footer(text=f'Страница: {self.page}/{ceil((self.total - 1) / 10)}\n'
-                              f'Всего треков: {self.total} ({format_time(duration_left)})\n'
+                              f'Всего треков: {self.total} ({format_time(self.remaining)})\n'
                               f'Повторение: {"вкл." if self.looping else "выкл."}')
         return embed
