@@ -145,6 +145,9 @@ class Music(Cog):
         if ctx.author.voice is None:
             return await ctx.send('Не в голосовом канале')
 
+        if query == '':
+            return await ctx.send('Запрос трека не может быть пустым')
+
         if not url_rx.match(query):
             query = await self._do_search(ctx, query)
             if query is None:
