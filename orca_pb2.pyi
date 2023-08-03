@@ -28,10 +28,12 @@ class PlayRequest(_message.Message):
     def __init__(self, guildID: _Optional[str] = ..., channelID: _Optional[str] = ..., url: _Optional[str] = ..., position: _Optional[int] = ...) -> None: ...
 
 class PlayReply(_message.Message):
-    __slots__ = ["tracks"]
+    __slots__ = ["tracks", "total"]
     TRACKS_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_FIELD_NUMBER: _ClassVar[int]
     tracks: _containers.RepeatedCompositeFieldContainer[TrackData]
-    def __init__(self, tracks: _Optional[_Iterable[_Union[TrackData, _Mapping]]] = ...) -> None: ...
+    total: int
+    def __init__(self, tracks: _Optional[_Iterable[_Union[TrackData, _Mapping]]] = ..., total: _Optional[int] = ...) -> None: ...
 
 class TrackData(_message.Message):
     __slots__ = ["title", "displayURL", "live", "position", "duration"]

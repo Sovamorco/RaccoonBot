@@ -167,14 +167,14 @@ class Music(Cog):
         color = get_embed_color(query)
         embed = Embed(color=color)
 
-        if len(res.tracks) == 1:
+        if res.total == 1:
             embed.title = '✅Трек добавлен'
             embed.description = f'[{res.tracks[0].title}]({res.tracks[0].displayURL})'
         else:
             embed.title = '✅Треки добавлены'
             embed.description = '\n'.join([f'[{track.title}]({track.displayURL})' for track in res.tracks[:10]])
-            if len(res.tracks) > 10:
-                embed.description += f'\n... и еще {len(res.tracks) - 10}'
+            if res.total > 10:
+                embed.description += f'\n... и еще {res.total - 10}'
 
         return await ctx.send(embed=embed)
 
@@ -391,14 +391,14 @@ class Music(Cog):
 
         embed = Embed(color=Color.dark_purple())
 
-        if len(res.tracks) == 1:
+        if res.total == 1:
             embed.title = '✅Трек добавлен'
             embed.description = f'[{res.tracks[0].title}]({res.tracks[0].displayURL})'
         else:
             embed.title = '✅Треки добавлены'
             embed.description = '\n'.join([f'[{track.title}]({track.displayURL})' for track in res.tracks[:10]])
-            if len(res.tracks) > 10:
-                embed.description += f'\n... и еще {len(res.tracks) - 10}'
+            if res.total > 10:
+                embed.description += f'\n... и еще {res.total - 10}'
 
         return await ctx.send(embed=embed)
 
