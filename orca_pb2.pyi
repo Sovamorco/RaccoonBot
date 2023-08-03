@@ -94,3 +94,49 @@ class RemoveRequest(_message.Message):
     guildID: str
     position: int
     def __init__(self, guildID: _Optional[str] = ..., position: _Optional[int] = ...) -> None: ...
+
+class SavePlaylistRequest(_message.Message):
+    __slots__ = ["guildID", "userID", "name"]
+    GUILDID_FIELD_NUMBER: _ClassVar[int]
+    USERID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    guildID: str
+    userID: str
+    name: str
+    def __init__(self, guildID: _Optional[str] = ..., userID: _Optional[str] = ..., name: _Optional[str] = ...) -> None: ...
+
+class LoadPlaylistRequest(_message.Message):
+    __slots__ = ["guildID", "playlistID", "channelID"]
+    GUILDID_FIELD_NUMBER: _ClassVar[int]
+    PLAYLISTID_FIELD_NUMBER: _ClassVar[int]
+    CHANNELID_FIELD_NUMBER: _ClassVar[int]
+    guildID: str
+    playlistID: str
+    channelID: str
+    def __init__(self, guildID: _Optional[str] = ..., playlistID: _Optional[str] = ..., channelID: _Optional[str] = ...) -> None: ...
+
+class ListPlaylistsRequest(_message.Message):
+    __slots__ = ["guildID", "userID"]
+    GUILDID_FIELD_NUMBER: _ClassVar[int]
+    USERID_FIELD_NUMBER: _ClassVar[int]
+    guildID: str
+    userID: str
+    def __init__(self, guildID: _Optional[str] = ..., userID: _Optional[str] = ...) -> None: ...
+
+class ListPlaylistsReply(_message.Message):
+    __slots__ = ["playlists"]
+    PLAYLISTS_FIELD_NUMBER: _ClassVar[int]
+    playlists: _containers.RepeatedCompositeFieldContainer[Playlist]
+    def __init__(self, playlists: _Optional[_Iterable[_Union[Playlist, _Mapping]]] = ...) -> None: ...
+
+class Playlist(_message.Message):
+    __slots__ = ["id", "name", "totalTracks", "totalDuration"]
+    ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    TOTALTRACKS_FIELD_NUMBER: _ClassVar[int]
+    TOTALDURATION_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    name: str
+    totalTracks: int
+    totalDuration: _duration_pb2.Duration
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., totalTracks: _Optional[int] = ..., totalDuration: _Optional[_Union[_duration_pb2.Duration, _Mapping]] = ...) -> None: ...

@@ -13,8 +13,10 @@ from yt_dlp.utils import DownloadCancelled
 
 from music_funcs import *
 from orca_pb2 import PlayRequest, PlayReply, GuildOnlyRequest, SeekRequest, \
-    GetTracksRequest, GetTracksReply, JoinRequest, RemoveRequest
+    GetTracksRequest, GetTracksReply, JoinRequest, RemoveRequest, SavePlaylistRequest, ListPlaylistsRequest, \
+    ListPlaylistsReply, LoadPlaylistRequest
 from orca_pb2_grpc import OrcaStub
+from utils import sform
 
 
 class SessionInterceptor(
@@ -113,7 +115,7 @@ class Music(Cog):
                 i + 1,
                 track['title'],
                 format_time(track['duration']),
-                )
+            )
 
         choice_embed = Embed(title='Выберите трек', description=embed_value, color=Color.red())
         choice_embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
@@ -251,6 +253,9 @@ class Music(Cog):
 
     @command(aliases=['c', 'connect'], help='Команда для подключения к голосовому каналу')
     async def join(self, ctx: Context):
+        if ctx.author.voice is None:
+            return await ctx.send('Не в голосовом канале')
+
         await self.bot.orca.Join(JoinRequest(
             guildID=str(ctx.guild.id),
             channelID=str(ctx.author.voice.channel.id),
@@ -308,6 +313,94 @@ class Music(Cog):
             position=pos,
         ))
         await ctx.message.add_reaction('👌')
+
+    @command(usage='save <название>',
+             help='Команда для сохранения очереди в плейлист')
+    async def save(self, ctx: Context, *, name: str):
+        await self.bot.orca.SavePlaylist(SavePlaylistRequest(
+            guildID=str(ctx.guild.id),
+            userID=str(ctx.author.id),
+            name=name,
+        ))
+        await ctx.message.add_reaction('👌')
+
+    @command(aliases=['pls'], help='Команда для просмотра сохраненных плейлистов')
+    async def playlists(self, ctx: Context):
+        res: ListPlaylistsReply = await self.bot.orca.ListPlaylists(ListPlaylistsRequest(
+            guildID=str(ctx.guild.id),
+            userID=str(ctx.author.id),
+        ))
+
+        embed_lines = []
+        for i, playlist in enumerate(res.playlists):
+            embed_lines.append(f'{i + 1}. **{playlist.name}** - '
+                               f'{playlist.totalTracks} {sform(playlist.totalTracks, "трек")} '
+                               f'({format_time(playlist.totalDuration.ToSeconds())})')
+
+        embed = Embed(color=Color.dark_purple(), title='Сохраненные плейлисты', description='\n'.join(embed_lines))
+
+        return await ctx.send(embed=embed)
+
+    @command(help='Команда для добавления сохраненного плейлиста в очередь')
+    async def load(self, ctx: Context):
+        if ctx.author.voice is None:
+            return await ctx.send('Не в голосовом канале')
+
+        res: ListPlaylistsReply = await self.bot.orca.ListPlaylists(ListPlaylistsRequest(
+            guildID=str(ctx.guild.id),
+            userID=str(ctx.author.id),
+        ))
+
+        embed_lines = []
+        for i, playlist in enumerate(res.playlists):
+            embed_lines.append(f'{i + 1}. **{playlist.name}** - '
+                               f'{playlist.totalTracks} {sform(playlist.totalTracks, "трек")} '
+                               f'({format_time(playlist.totalDuration.ToSeconds())})')
+
+        embed = Embed(color=Color.dark_purple(), title='Выберите плейлист', description='\n'.join(embed_lines))
+        embed.set_footer(text='Автоматическая отмена через 30 секунд\nОтправьте 0 для отмены')
+
+        choicemsg = await ctx.send(embed=embed)
+
+        canc = False
+
+        prefixes = await self.bot.get_prefix(ctx.message)
+
+        def verify(m):
+            nonlocal canc
+
+            if m.content.isdigit():
+                return 0 <= int(m.content) <= len(res.playlists) and m.channel == ctx.channel and m.author == ctx.author
+
+            canc = m.channel == ctx.channel and m.author == ctx.author and any(
+                m.content.startswith(prefix) and len(m.content) > len(prefix) for prefix in prefixes)
+            return canc
+
+        msg = await self.bot.wait_for('message', check=verify, timeout=30)
+        if canc or int(msg.content) == 0:
+            await choicemsg.delete()
+            return None
+
+        chosen = res.playlists[int(msg.content) - 1].id
+
+        res: PlayReply = await self.bot.orca.LoadPlaylist(LoadPlaylistRequest(
+            guildID=str(ctx.guild.id),
+            playlistID=chosen,
+            channelID=str(ctx.author.voice.channel.id),
+        ))
+
+        embed = Embed(color=Color.dark_purple())
+
+        if len(res.tracks) == 1:
+            embed.title = '✅Трек добавлен'
+            embed.description = f'[{res.tracks[0].title}]({res.tracks[0].displayURL})'
+        else:
+            embed.title = '✅Треки добавлены'
+            embed.description = '\n'.join([f'[{track.title}]({track.displayURL})' for track in res.tracks[:10]])
+            if len(res.tracks) > 10:
+                embed.description += f'\n... и еще {len(res.tracks) - 10}'
+
+        return await ctx.send(embed=embed)
 
 
 async def music_setup(bot):

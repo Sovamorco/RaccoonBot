@@ -75,6 +75,21 @@ class OrcaStub(object):
                 request_serializer=orca__pb2.RemoveRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 )
+        self.SavePlaylist = channel.unary_unary(
+                '/orca.Orca/SavePlaylist',
+                request_serializer=orca__pb2.SavePlaylistRequest.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                )
+        self.LoadPlaylist = channel.unary_unary(
+                '/orca.Orca/LoadPlaylist',
+                request_serializer=orca__pb2.LoadPlaylistRequest.SerializeToString,
+                response_deserializer=orca__pb2.PlayReply.FromString,
+                )
+        self.ListPlaylists = channel.unary_unary(
+                '/orca.Orca/ListPlaylists',
+                request_serializer=orca__pb2.ListPlaylistsRequest.SerializeToString,
+                response_deserializer=orca__pb2.ListPlaylistsReply.FromString,
+                )
 
 
 class OrcaServicer(object):
@@ -152,6 +167,24 @@ class OrcaServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SavePlaylist(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def LoadPlaylist(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListPlaylists(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_OrcaServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -214,6 +247,21 @@ def add_OrcaServicer_to_server(servicer, server):
                     servicer.Remove,
                     request_deserializer=orca__pb2.RemoveRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+            'SavePlaylist': grpc.unary_unary_rpc_method_handler(
+                    servicer.SavePlaylist,
+                    request_deserializer=orca__pb2.SavePlaylistRequest.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+            'LoadPlaylist': grpc.unary_unary_rpc_method_handler(
+                    servicer.LoadPlaylist,
+                    request_deserializer=orca__pb2.LoadPlaylistRequest.FromString,
+                    response_serializer=orca__pb2.PlayReply.SerializeToString,
+            ),
+            'ListPlaylists': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListPlaylists,
+                    request_deserializer=orca__pb2.ListPlaylistsRequest.FromString,
+                    response_serializer=orca__pb2.ListPlaylistsReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -426,5 +474,56 @@ class Orca(object):
         return grpc.experimental.unary_unary(request, target, '/orca.Orca/Remove',
             orca__pb2.RemoveRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SavePlaylist(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/orca.Orca/SavePlaylist',
+            orca__pb2.SavePlaylistRequest.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def LoadPlaylist(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/orca.Orca/LoadPlaylist',
+            orca__pb2.LoadPlaylistRequest.SerializeToString,
+            orca__pb2.PlayReply.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def ListPlaylists(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/orca.Orca/ListPlaylists',
+            orca__pb2.ListPlaylistsRequest.SerializeToString,
+            orca__pb2.ListPlaylistsReply.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
