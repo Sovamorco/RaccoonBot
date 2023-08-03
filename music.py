@@ -206,35 +206,35 @@ class Music(Cog):
 
     @command(help='Команда для пропуска трека')
     async def skip(self, ctx: Context):
-        self.bot.orca.Skip(GuildOnlyRequest(
+        await self.bot.orca.Skip(GuildOnlyRequest(
             guildID=str(ctx.guild.id),
         ))
         await ctx.message.add_reaction('👌')
 
     @command(help='Команда для постановки трека на паузу')
     async def pause(self, ctx: Context):
-        self.bot.orca.Pause(GuildOnlyRequest(
+        await self.bot.orca.Pause(GuildOnlyRequest(
             guildID=str(ctx.guild.id),
         ))
         await ctx.message.add_reaction('👌')
 
     @command(help='Команда для продолжения трека')
     async def resume(self, ctx: Context):
-        self.bot.orca.Resume(GuildOnlyRequest(
+        await self.bot.orca.Resume(GuildOnlyRequest(
             guildID=str(ctx.guild.id),
         ))
         await ctx.message.add_reaction('👌')
 
     @command(help='Команда для включения/выключения повторения очереди')
     async def loop(self, ctx: Context):
-        self.bot.orca.Loop(GuildOnlyRequest(
+        await self.bot.orca.Loop(GuildOnlyRequest(
             guildID=str(ctx.guild.id),
         ))
         await ctx.message.add_reaction('👌')
 
     @command(aliases=['qs'], help='Команда для перемешивания текущей очереди')
     async def qshuffle(self, ctx: Context):
-        self.bot.orca.ShuffleQueue(GuildOnlyRequest(
+        await self.bot.orca.ShuffleQueue(GuildOnlyRequest(
             guildID=str(ctx.guild.id),
         ))
         await ctx.message.add_reaction('👌')
