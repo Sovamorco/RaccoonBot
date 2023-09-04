@@ -69,7 +69,7 @@ class Moderation(Cog):
 
     @command(name='exec', pass_context=True, help='Не трогай, она тебя сожрет', hidden=True, usage='exec <query>')
     async def exec_(self, ctx, *, query):
-        if ctx.author.id == self.bot.config['discord']['personal_id']:
+        if str(ctx.author.id) == self.bot.config['discord']['personal_id']:
             exec(
                 f'async def __ex(ctx): ' +
                 ''.join(f'\n {line}' for line in query.split('\n'))
