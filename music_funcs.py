@@ -140,4 +140,7 @@ class Queue:
 
         await self.get()
 
+        if self.remaining == 0:
+            return await self.message.delete()
+
         await self.message.edit(embed=self.embed)

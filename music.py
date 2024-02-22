@@ -9,6 +9,7 @@ from discord.ext.commands import Bot, Cog, Context, hybrid_command
 from google.protobuf.duration_pb2 import Duration
 from google.protobuf.empty_pb2 import Empty
 from grpc.aio import UnaryStreamClientInterceptor, UnaryUnaryClientInterceptor
+from regex import E
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadCancelled
 
@@ -434,7 +435,10 @@ class Music(Cog):
             page,
         )
 
-        await q.get()
+        try:
+            await q.get()
+        except QueueEmpty:
+            return await ctx.send("Ничего не играет")
 
         msg = await ctx.send(embed=q.embed)
 
@@ -443,7 +447,12 @@ class Music(Cog):
         if ctx.guild.id in self.queues:
             old: Queue = self.queues[ctx.guild.id]
             if old.message is not None:
-                await old.message.delete()
+                try:
+                    await old.message.delete()
+                except Exception as e:
+                    print(
+                        f"Error while deleting old queue message: {e}", file=sys.stderr
+                    )
 
         self.queues[ctx.guild.id] = q
 
