@@ -1,4 +1,5 @@
 import asyncio
+from code import interact
 from collections import ChainMap
 import sys
 from typing import Optional
@@ -469,7 +470,16 @@ class Music(Cog):
         except QueueEmpty:
             return await ctx.send("Ничего не играет")
 
-        msg = await ctx.send(embed=q.embed)
+        if ctx.interaction is not None:
+            await ctx.interaction.response.send_message(
+                "Очередь отправлена отдельным сообщением",
+                ephemeral=True,
+                delete_after=60,
+            )
+
+            msg = await ctx.channel.send(embed=q.embed)
+        else:
+            msg = await ctx.reply(embed=q.embed)
 
         q.message = msg
 
