@@ -100,16 +100,6 @@ class Music(Cog):
     async def stop_playing(self, guild_id):
         return await self.orca.Stop(GuildOnlyRequest(guildID=guild_id))
 
-    @Cog.listener()
-    async def on_voice_state_update(self, member, before, after):
-        if not after.channel and before.channel:
-            if any(
-                self.bot.user in channel.members
-                and all(channel_member.bot for channel_member in channel.members)
-                for channel in member.guild.voice_channels
-            ):
-                await self.stop_playing(member.guild.id)
-
     async def on_queue_update(self, guild_id):
         if guild_id not in self.queues:
             return
@@ -365,9 +355,44 @@ class Music(Cog):
 
     @hybrid_command(help="Команда для остановки плеера и очистки очереди")
     async def stop(self, ctx: Context):
+        choicemsg = await ctx.send(
+            embed=Embed(
+                title="Вы уверены?",
+                description="Это действие остановит плеер и очистит очередь",
+                color=Color.red(),
+            ),
+        )
+
+        canc = False
+        prefixes = await self.bot.get_prefix(ctx.message)
+
+        def verify(m):
+            nonlocal canc
+
+            canc = (
+                m.channel == ctx.message.channel
+                and m.author == ctx.message.author
+                and any(
+                    m.content.startswith(prefix) and len(m.content) > len(prefix)
+                    for prefix in prefixes
+                )
+            )
+
+            return canc or m.content.lower() in ["да", "yes", "нет", "no"]
+
+        try:
+            msg = await self.bot.wait_for("message", check=verify, timeout=30)
+        except asyncio.TimeoutError:
+            return await choicemsg.delete()
+
+        if canc or msg.content.lower() in ["нет", "no"]:
+            return await choicemsg.delete()
+
         await self.stop_playing(str(ctx.guild.id))
 
-        return await ok(ctx, "Плеер остановлен")
+        return await choicemsg.edit(
+            embed=Embed(title="✅Плеер остановлен", color=Color.red())
+        )
 
     @hybrid_command(
         aliases=["dc", "disconnect"], help="Команда для отключения от голосового канала"
