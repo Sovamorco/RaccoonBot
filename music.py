@@ -6,12 +6,8 @@ import grpc
 from discord import Message
 from discord.ext.commands import Bot, Cog, Context, hybrid_command
 from google.protobuf.duration_pb2 import Duration
-from grpc.aio import (
-    StreamStreamClientInterceptor,
-    StreamUnaryClientInterceptor,
-    UnaryStreamClientInterceptor,
-    UnaryUnaryClientInterceptor,
-)
+from google.protobuf.empty_pb2 import Empty
+from grpc.aio import UnaryStreamClientInterceptor, UnaryUnaryClientInterceptor
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadCancelled
 
@@ -26,38 +22,38 @@ from orca_pb2 import (
     LoadPlaylistRequest,
     PlayReply,
     PlayRequest,
+    QueueChangeNotification,
     RemoveRequest,
     SavePlaylistRequest,
     SeekRequest,
 )
 from orca_pb2_grpc import OrcaStub
-from utils import sform, ok
+from utils import ok, sform
 
 
-class SessionInterceptor(
-    StreamStreamClientInterceptor,
-    StreamUnaryClientInterceptor,
-    UnaryStreamClientInterceptor,
-    UnaryUnaryClientInterceptor,
-):
+async def token_intercept(token, continuation, client_call_details, request):
+    client_call_details.metadata.add("token", token)
+    return await continuation(client_call_details, request)
+
+
+class SessionUUInterceptor(UnaryUnaryClientInterceptor):
     def __init__(self, token):
         self.token = token
 
-    async def intercept(self, continuation, client_call_details, request):
-        client_call_details.metadata.add("token", self.token)
-        return await continuation(client_call_details, request)
+    async def intercept_unary_unary(self, continuation, client_call_details, request):
+        return await token_intercept(
+            self.token, continuation, client_call_details, request
+        )
 
-    async def intercept_stream_stream(self, continuation, client_call_details, request):
-        return await self.intercept(continuation, client_call_details, request)
 
-    async def intercept_stream_unary(self, continuation, client_call_details, request):
-        return await self.intercept(continuation, client_call_details, request)
+class SessionUSInterceptor(UnaryStreamClientInterceptor):
+    def __init__(self, token):
+        self.token = token
 
     async def intercept_unary_stream(self, continuation, client_call_details, request):
-        return await self.intercept(continuation, client_call_details, request)
-
-    async def intercept_unary_unary(self, continuation, client_call_details, request):
-        return await self.intercept(continuation, client_call_details, request)
+        return await token_intercept(
+            self.token, continuation, client_call_details, request
+        )
 
 
 class Music(Cog):
@@ -66,15 +62,31 @@ class Music(Cog):
 
         if not hasattr(bot, "orca"):
             print("Creating orca connection")
-            sess_interceptor = SessionInterceptor(self.bot.config["discord"]["token"])
+            sess_interceptors = [
+                SessionUUInterceptor(self.bot.config["discord"]["token"]),
+                SessionUSInterceptor(self.bot.config["discord"]["token"]),
+            ]
+
             channel = grpc.aio.insecure_channel(
                 bot.config["orca"]["address"],
-                interceptors=[sess_interceptor],
+                interceptors=sess_interceptors,
             )
+
             bot.orca = OrcaStub(channel)
 
+            bot.loop.create_task(self._watch_queues())
+
+        self.orca: OrcaStub = self.bot.orca
+        self.queues: map[int, Queue] = {}
+
+    async def _watch_queues(self):
+        async for msg in self.orca.Subscribe(Empty()):
+            msg: QueueChangeNotification
+
+            self.bot.loop.create_task(self.on_queue_update(int(msg.guild)))
+
     async def stop_playing(self, guild_id):
-        return await self.bot.orca.Stop(GuildOnlyRequest(guildID=guild_id))
+        return await self.orca.Stop(GuildOnlyRequest(guildID=guild_id))
 
     @Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -85,6 +97,13 @@ class Music(Cog):
                 for channel in member.guild.voice_channels
             ):
                 await self.stop_playing(member.guild.id)
+
+    async def on_queue_update(self, guild_id):
+        if guild_id not in self.queues:
+            return
+
+        q: Queue = self.queues[guild_id]
+        await q.update()
 
     async def _do_search(
         self, ctx: Context, query: str
@@ -209,7 +228,7 @@ class Music(Cog):
         )
         if pos is not None:
             req.position = pos
-        res: PlayReply = await self.bot.orca.Play(req)
+        res: PlayReply = await self.orca.Play(req)
 
         color = get_embed_color(query)
         embed = Embed(color=color)
@@ -263,7 +282,7 @@ class Music(Cog):
     async def seek(self, ctx: Context, *, seconds: float):
         pos = Duration()
         pos.FromNanoseconds(int(seconds * 10**9))
-        await self.bot.orca.Seek(
+        await self.orca.Seek(
             SeekRequest(
                 guildID=str(ctx.guild.id),
                 position=pos,
@@ -274,7 +293,7 @@ class Music(Cog):
 
     @hybrid_command(help="Команда для пропуска трека")
     async def skip(self, ctx: Context):
-        await self.bot.orca.Skip(
+        await self.orca.Skip(
             GuildOnlyRequest(
                 guildID=str(ctx.guild.id),
             )
@@ -284,7 +303,7 @@ class Music(Cog):
 
     @hybrid_command(help="Команда для постановки трека на паузу")
     async def pause(self, ctx: Context):
-        await self.bot.orca.Pause(
+        await self.orca.Pause(
             GuildOnlyRequest(
                 guildID=str(ctx.guild.id),
             )
@@ -294,7 +313,7 @@ class Music(Cog):
 
     @hybrid_command(help="Команда для продолжения трека")
     async def resume(self, ctx: Context):
-        await self.bot.orca.Resume(
+        await self.orca.Resume(
             GuildOnlyRequest(
                 guildID=str(ctx.guild.id),
             )
@@ -304,13 +323,13 @@ class Music(Cog):
 
     @hybrid_command(help="Команда для включения/выключения повторения очереди")
     async def loop(self, ctx: Context):
-        await self.bot.orca.Loop(
+        await self.orca.Loop(
             GuildOnlyRequest(
                 guildID=str(ctx.guild.id),
             )
         )
 
-        queue_state: GetTracksReply = await self.bot.orca.GetTracks(
+        queue_state: GetTracksReply = await self.orca.GetTracks(
             GetTracksRequest(
                 guildID=str(ctx.guild.id),
                 start=0,
@@ -324,7 +343,7 @@ class Music(Cog):
 
     @hybrid_command(aliases=["qs"], help="Команда для перемешивания текущей очереди")
     async def qshuffle(self, ctx: Context):
-        await self.bot.orca.ShuffleQueue(
+        await self.orca.ShuffleQueue(
             GuildOnlyRequest(
                 guildID=str(ctx.guild.id),
             )
@@ -342,7 +361,7 @@ class Music(Cog):
         aliases=["dc", "disconnect"], help="Команда для отключения от голосового канала"
     )
     async def leave(self, ctx: Context):
-        await self.bot.orca.Leave(GuildOnlyRequest(guildID=str(ctx.guild.id)))
+        await self.orca.Leave(GuildOnlyRequest(guildID=str(ctx.guild.id)))
 
         return await ok(ctx, "Отключен от голосового канала")
 
@@ -353,7 +372,7 @@ class Music(Cog):
         if ctx.author.voice is None:
             return await ctx.send("Не в голосовом канале")
 
-        await self.bot.orca.Join(
+        await self.orca.Join(
             JoinRequest(
                 guildID=str(ctx.guild.id),
                 channelID=str(ctx.author.voice.channel.id),
@@ -367,7 +386,7 @@ class Music(Cog):
         help="Команда для отображения текущего трека",
     )
     async def now(self, ctx):
-        res: GetTracksReply = await self.bot.orca.GetTracks(
+        res: GetTracksReply = await self.orca.GetTracks(
             GetTracksRequest(
                 guildID=str(ctx.guild.id),
                 start=0,
@@ -394,36 +413,28 @@ class Music(Cog):
         usage="queue [страница]",
         help="Команда для отображения очереди воспроизведения",
     )
-    async def queue(self, ctx, page: int = 1):
+    async def queue(self, ctx: Context, page: int = 1):
         if page < 1:
             return await ctx.send("Страница не может быть отрицательной")
 
-        currentres: GetTracksReply = await self.bot.orca.GetTracks(
-            GetTracksRequest(
-                guildID=str(ctx.guild.id),
-                start=0,
-                end=1,
-            )
-        )
-        if len(currentres.tracks) < 1:
-            return await ctx.send("Ничего не играет")
-        current = currentres.tracks[0]
-        res: GetTracksReply = await self.bot.orca.GetTracks(
-            GetTracksRequest(
-                guildID=str(ctx.guild.id),
-                start=1 + 10 * (page - 1),
-                end=1 + 10 * page,
-            )
-        )
         q = Queue(
-            current,
-            res.tracks,
-            res.looping,
+            self.orca,
+            ctx.guild.id,
             page,
-            res.totalTracks,
-            res.remaining.ToSeconds(),
         )
-        return await ctx.send(embed=q.embed)
+
+        await q.get()
+
+        msg = await ctx.send(embed=q.embed)
+
+        q.message = msg
+
+        if ctx.guild.id in self.queues:
+            old: Queue = self.queues[ctx.guild.id]
+            if old.message is not None:
+                await old.message.delete()
+
+        self.queues[ctx.guild.id] = q
 
     @hybrid_command(
         aliases=["r", "delete"],
@@ -434,7 +445,7 @@ class Music(Cog):
         if pos < 0:
             return await ctx.send("Номер не может быть отрицательным")
 
-        await self.bot.orca.Remove(
+        await self.orca.Remove(
             RemoveRequest(
                 guildID=str(ctx.guild.id),
                 position=pos,
@@ -447,7 +458,7 @@ class Music(Cog):
         usage="save <название>", help="Команда для сохранения очереди в плейлист"
     )
     async def save(self, ctx: Context, *, name: str):
-        await self.bot.orca.SavePlaylist(
+        await self.orca.SavePlaylist(
             SavePlaylistRequest(
                 guildID=str(ctx.guild.id),
                 userID=str(ctx.author.id),
@@ -461,7 +472,7 @@ class Music(Cog):
         aliases=["pls"], help="Команда для просмотра сохраненных плейлистов"
     )
     async def playlists(self, ctx: Context):
-        res: ListPlaylistsReply = await self.bot.orca.ListPlaylists(
+        res: ListPlaylistsReply = await self.orca.ListPlaylists(
             ListPlaylistsRequest(
                 guildID=str(ctx.guild.id),
                 userID=str(ctx.author.id),
@@ -489,7 +500,7 @@ class Music(Cog):
         if ctx.author.voice is None:
             return await ctx.send("Не в голосовом канале")
 
-        res: ListPlaylistsReply = await self.bot.orca.ListPlaylists(
+        res: ListPlaylistsReply = await self.orca.ListPlaylists(
             ListPlaylistsRequest(
                 guildID=str(ctx.guild.id),
                 userID=str(ctx.author.id),
@@ -547,7 +558,7 @@ class Music(Cog):
 
         chosen = res.playlists[int(msg.content) - 1].id
 
-        res: PlayReply = await self.bot.orca.LoadPlaylist(
+        res: PlayReply = await self.orca.LoadPlaylist(
             LoadPlaylistRequest(
                 guildID=str(ctx.guild.id),
                 playlistID=chosen,

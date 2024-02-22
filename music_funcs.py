@@ -1,10 +1,16 @@
 from math import ceil
 
 import regex as re
-from discord import Color, Embed
+from discord import Color, Embed, Message
 from discord.ext.commands import CommandInvokeError
 
-from orca_pb2 import TrackData
+from orca_pb2 import GetTracksReply, GetTracksRequest, TrackData
+from orca_pb2_grpc import OrcaStub
+
+
+class QueueEmpty(Exception):
+    pass
+
 
 spotify_rx = re.compile(
     r"(?:spotify:|(?:https?:\/\/)?(?:www\.)?open\.spotify\.com\/)(playlist|track|album)(?:\:|\/)([a-zA-Z0-9]+)(.*)$"
@@ -46,22 +52,56 @@ class MusicCommandError(CommandInvokeError):
 
 
 class Queue:
+
     def __init__(
         self,
-        current: TrackData,
-        tracks: list[TrackData],
-        looping: bool,
+        orca: OrcaStub,
+        guild_id: int,
         page: int,
-        total: int,
-        remaining: int,
     ):
-        self.current = current
-        self.tracks = tracks
-        self.looping = looping
+        self.orca = orca
+        self.guild_id: int = guild_id
+        self.message: Message = None
+
+        self.current: TrackData = None
+        self.tracks: list[TrackData] = []
+        self.looping = False
+        self.paused = False
         self.page = page
-        self.start = (page - 1) * 10 + 1
-        self.total = total
-        self.remaining = remaining
+        self.total = 0
+        self.remaining = 0
+
+    async def get(self):
+        currentres: GetTracksReply = await self.orca.GetTracks(
+            GetTracksRequest(
+                guildID=str(self.guild_id),
+                start=0,
+                end=1,
+            )
+        )
+        if len(currentres.tracks) < 1:
+            raise QueueEmpty
+
+        current = currentres.tracks[0]
+
+        res: GetTracksReply = await self.orca.GetTracks(
+            GetTracksRequest(
+                guildID=str(self.guild_id),
+                start=1 + 10 * (self.page - 1),
+                end=1 + 10 * self.page,
+            )
+        )
+
+        self.current = current
+        self.tracks = res.tracks
+        self.looping = res.looping
+        self.paused = res.paused
+        self.total = res.totalTracks
+        self.remaining = res.remaining
+
+    @property
+    def start(self):
+        return 1 + 10 * (self.page - 1)
 
     @property
     def color(self):
@@ -73,11 +113,15 @@ class Queue:
             poss = "🔴 LIVE"
         else:
             poss = f"{format_time(self.current.position.ToSeconds())}/{format_time(self.current.duration.ToSeconds())}"
-        result = f"\n`Сейчас играет:` [**{self.current.title}**]({self.current.displayURL}) ({poss})\n\n\n"
+
+        playstate = "⏸️`На паузе:`" if self.paused else "▶️`Сейчас играет:`"
+        result = f"\n{playstate} [**{self.current.title}**]({self.current.displayURL}) ({poss})\n\n\n"
+
         for index, track in enumerate(self.tracks):
             result += (
                 f"`{self.start + index}.` [**{track.title}**]({track.displayURL})\n"
             )
+
         return result
 
     @property
@@ -85,7 +129,15 @@ class Queue:
         embed = Embed(color=self.color, description=self._to_embed_content)
         embed.set_footer(
             text=f"Страница: {self.page}/{ceil((self.total - 1) / 10)}\n"
-            f"Всего треков: {self.total} ({format_time(self.remaining)})\n"
+            f"Всего треков: {self.total} ({format_time(self.remaining.ToSeconds())})\n"
             f'Повторение: {"вкл." if self.looping else "выкл."}'
         )
         return embed
+
+    async def update(self):
+        if self.message is None:
+            return
+
+        await self.get()
+
+        await self.message.edit(embed=self.embed)
