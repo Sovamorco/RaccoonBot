@@ -26,7 +26,7 @@ jobs:
       run: DOCKER_BUILDKIT=1 docker build -t ${{ env.image }} .
 
     - name: Update service
-      run: docker service update raccoonbot --image ${{ env.image }} --update-failure-action rollback --rollback-failure-action continue | tee /tmp/capture.out
+      run: docker service update raccoonbot --image ${{ env.image }} | tee /tmp/capture-${{github.run_id}}-${{github.run_attempt}}-update.out
 
     - name: Exit if rollback happened
-      run: if [ "$(cat /tmp/capture.out | grep -c '^rollback:')" -ge 1 ]; then echo 'Rollback occurred'; exit 1; fi
+      run: if [ "$(cat /tmp/capture-${{github.run_id}}-${{github.run_attempt}}-update.out | grep -c '^rollback:')" -ge 1 ]; then echo 'Rollback occurred'; exit 1; fi

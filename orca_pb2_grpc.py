@@ -90,6 +90,11 @@ class OrcaStub(object):
                 request_serializer=orca__pb2.ListPlaylistsRequest.SerializeToString,
                 response_deserializer=orca__pb2.ListPlaylistsReply.FromString,
                 )
+        self.Health = channel.unary_unary(
+                '/orca.Orca/Health',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                )
 
 
 class OrcaServicer(object):
@@ -185,6 +190,12 @@ class OrcaServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Health(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_OrcaServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -262,6 +273,11 @@ def add_OrcaServicer_to_server(servicer, server):
                     servicer.ListPlaylists,
                     request_deserializer=orca__pb2.ListPlaylistsRequest.FromString,
                     response_serializer=orca__pb2.ListPlaylistsReply.SerializeToString,
+            ),
+            'Health': grpc.unary_unary_rpc_method_handler(
+                    servicer.Health,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -525,5 +541,22 @@ class Orca(object):
         return grpc.experimental.unary_unary(request, target, '/orca.Orca/ListPlaylists',
             orca__pb2.ListPlaylistsRequest.SerializeToString,
             orca__pb2.ListPlaylistsReply.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Health(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/orca.Orca/Health',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

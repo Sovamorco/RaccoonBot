@@ -1,15 +1,14 @@
 import os
 
-from pymorphy2 import MorphAnalyzer
-from pymorphy2.shapes import restore_capitalization
+from discord.ext.commands import Context
+from pymorphy3 import MorphAnalyzer
+from pymorphy3.shapes import restore_capitalization
 
-dev = os.getenv('PRODUCTION') != 'true'
+dev = os.getenv("PRODUCTION") != "true"
 
 morph = MorphAnalyzer()
 
-broken = {
-    'печенька': ['печенька', 'печеньки', 'печенек']
-}
+broken = {"печенька": ["печенька", "печеньки", "печенек"]}
 
 
 def form(num, arr):
@@ -30,3 +29,10 @@ def sform(num, word):
         formed = parsed.make_agree_with_number(num).word
     restored = restore_capitalization(formed, word)
     return restored
+
+
+async def ok(ctx: Context, msg: str):
+    if ctx.interaction is None:
+        return await ctx.message.add_reaction("👌")
+
+    return await ctx.send(msg + " 👌")

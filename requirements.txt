@@ -2,7 +2,7 @@ regex~=2023.0
 aiohttp~=3.0
 beautifulsoup4~=4.0
 pathvalidate~=2.0
-pymorphy2~=0.9.0
+pymorphy3~=2.0
 GitPython~=3.0
 common[async,sql_async] @ git+https://github.com/Sovamorco/common
 discord.py[voice]~=2.0

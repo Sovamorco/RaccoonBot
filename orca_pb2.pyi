@@ -1,9 +1,14 @@
+from typing import ClassVar as _ClassVar
+from typing import Iterable as _Iterable
+from typing import Mapping as _Mapping
+from typing import Optional as _Optional
+from typing import Union as _Union
+
+from google.protobuf import descriptor as _descriptor
 from google.protobuf import duration_pb2 as _duration_pb2
 from google.protobuf import empty_pb2 as _empty_pb2
-from google.protobuf.internal import containers as _containers
-from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
+from google.protobuf.internal import containers as _containers
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -13,7 +18,9 @@ class JoinRequest(_message.Message):
     CHANNELID_FIELD_NUMBER: _ClassVar[int]
     guildID: str
     channelID: str
-    def __init__(self, guildID: _Optional[str] = ..., channelID: _Optional[str] = ...) -> None: ...
+    def __init__(
+        self, guildID: _Optional[str] = ..., channelID: _Optional[str] = ...
+    ) -> None: ...
 
 class PlayRequest(_message.Message):
     __slots__ = ["guildID", "channelID", "url", "position"]
@@ -25,7 +32,13 @@ class PlayRequest(_message.Message):
     channelID: str
     url: str
     position: int
-    def __init__(self, guildID: _Optional[str] = ..., channelID: _Optional[str] = ..., url: _Optional[str] = ..., position: _Optional[int] = ...) -> None: ...
+    def __init__(
+        self,
+        guildID: _Optional[str] = ...,
+        channelID: _Optional[str] = ...,
+        url: _Optional[str] = ...,
+        position: _Optional[int] = ...,
+    ) -> None: ...
 
 class PlayReply(_message.Message):
     __slots__ = ["tracks", "total"]
@@ -33,7 +46,11 @@ class PlayReply(_message.Message):
     TOTAL_FIELD_NUMBER: _ClassVar[int]
     tracks: _containers.RepeatedCompositeFieldContainer[TrackData]
     total: int
-    def __init__(self, tracks: _Optional[_Iterable[_Union[TrackData, _Mapping]]] = ..., total: _Optional[int] = ...) -> None: ...
+    def __init__(
+        self,
+        tracks: _Optional[_Iterable[_Union[TrackData, _Mapping]]] = ...,
+        total: _Optional[int] = ...,
+    ) -> None: ...
 
 class TrackData(_message.Message):
     __slots__ = ["title", "displayURL", "live", "position", "duration"]
@@ -47,7 +64,14 @@ class TrackData(_message.Message):
     live: bool
     position: _duration_pb2.Duration
     duration: _duration_pb2.Duration
-    def __init__(self, title: _Optional[str] = ..., displayURL: _Optional[str] = ..., live: bool = ..., position: _Optional[_Union[_duration_pb2.Duration, _Mapping]] = ..., duration: _Optional[_Union[_duration_pb2.Duration, _Mapping]] = ...) -> None: ...
+    def __init__(
+        self,
+        title: _Optional[str] = ...,
+        displayURL: _Optional[str] = ...,
+        live: bool = ...,
+        position: _Optional[_Union[_duration_pb2.Duration, _Mapping]] = ...,
+        duration: _Optional[_Union[_duration_pb2.Duration, _Mapping]] = ...,
+    ) -> None: ...
 
 class GuildOnlyRequest(_message.Message):
     __slots__ = ["guildID"]
@@ -61,7 +85,11 @@ class SeekRequest(_message.Message):
     POSITION_FIELD_NUMBER: _ClassVar[int]
     guildID: str
     position: _duration_pb2.Duration
-    def __init__(self, guildID: _Optional[str] = ..., position: _Optional[_Union[_duration_pb2.Duration, _Mapping]] = ...) -> None: ...
+    def __init__(
+        self,
+        guildID: _Optional[str] = ...,
+        position: _Optional[_Union[_duration_pb2.Duration, _Mapping]] = ...,
+    ) -> None: ...
 
 class SeekReply(_message.Message):
     __slots__ = []
@@ -75,7 +103,12 @@ class GetTracksRequest(_message.Message):
     guildID: str
     start: int
     end: int
-    def __init__(self, guildID: _Optional[str] = ..., start: _Optional[int] = ..., end: _Optional[int] = ...) -> None: ...
+    def __init__(
+        self,
+        guildID: _Optional[str] = ...,
+        start: _Optional[int] = ...,
+        end: _Optional[int] = ...,
+    ) -> None: ...
 
 class GetTracksReply(_message.Message):
     __slots__ = ["tracks", "totalTracks", "looping", "remaining"]
@@ -87,7 +120,13 @@ class GetTracksReply(_message.Message):
     totalTracks: int
     looping: bool
     remaining: _duration_pb2.Duration
-    def __init__(self, tracks: _Optional[_Iterable[_Union[TrackData, _Mapping]]] = ..., totalTracks: _Optional[int] = ..., looping: bool = ..., remaining: _Optional[_Union[_duration_pb2.Duration, _Mapping]] = ...) -> None: ...
+    def __init__(
+        self,
+        tracks: _Optional[_Iterable[_Union[TrackData, _Mapping]]] = ...,
+        totalTracks: _Optional[int] = ...,
+        looping: bool = ...,
+        remaining: _Optional[_Union[_duration_pb2.Duration, _Mapping]] = ...,
+    ) -> None: ...
 
 class RemoveRequest(_message.Message):
     __slots__ = ["guildID", "position"]
@@ -95,7 +134,9 @@ class RemoveRequest(_message.Message):
     POSITION_FIELD_NUMBER: _ClassVar[int]
     guildID: str
     position: int
-    def __init__(self, guildID: _Optional[str] = ..., position: _Optional[int] = ...) -> None: ...
+    def __init__(
+        self, guildID: _Optional[str] = ..., position: _Optional[int] = ...
+    ) -> None: ...
 
 class SavePlaylistRequest(_message.Message):
     __slots__ = ["guildID", "userID", "name"]
@@ -105,7 +146,12 @@ class SavePlaylistRequest(_message.Message):
     guildID: str
     userID: str
     name: str
-    def __init__(self, guildID: _Optional[str] = ..., userID: _Optional[str] = ..., name: _Optional[str] = ...) -> None: ...
+    def __init__(
+        self,
+        guildID: _Optional[str] = ...,
+        userID: _Optional[str] = ...,
+        name: _Optional[str] = ...,
+    ) -> None: ...
 
 class LoadPlaylistRequest(_message.Message):
     __slots__ = ["guildID", "playlistID", "channelID"]
@@ -115,7 +161,12 @@ class LoadPlaylistRequest(_message.Message):
     guildID: str
     playlistID: str
     channelID: str
-    def __init__(self, guildID: _Optional[str] = ..., playlistID: _Optional[str] = ..., channelID: _Optional[str] = ...) -> None: ...
+    def __init__(
+        self,
+        guildID: _Optional[str] = ...,
+        playlistID: _Optional[str] = ...,
+        channelID: _Optional[str] = ...,
+    ) -> None: ...
 
 class ListPlaylistsRequest(_message.Message):
     __slots__ = ["guildID", "userID"]
@@ -123,13 +174,17 @@ class ListPlaylistsRequest(_message.Message):
     USERID_FIELD_NUMBER: _ClassVar[int]
     guildID: str
     userID: str
-    def __init__(self, guildID: _Optional[str] = ..., userID: _Optional[str] = ...) -> None: ...
+    def __init__(
+        self, guildID: _Optional[str] = ..., userID: _Optional[str] = ...
+    ) -> None: ...
 
 class ListPlaylistsReply(_message.Message):
     __slots__ = ["playlists"]
     PLAYLISTS_FIELD_NUMBER: _ClassVar[int]
     playlists: _containers.RepeatedCompositeFieldContainer[Playlist]
-    def __init__(self, playlists: _Optional[_Iterable[_Union[Playlist, _Mapping]]] = ...) -> None: ...
+    def __init__(
+        self, playlists: _Optional[_Iterable[_Union[Playlist, _Mapping]]] = ...
+    ) -> None: ...
 
 class Playlist(_message.Message):
     __slots__ = ["id", "name", "totalTracks", "totalDuration"]
@@ -141,4 +196,10 @@ class Playlist(_message.Message):
     name: str
     totalTracks: int
     totalDuration: _duration_pb2.Duration
-    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., totalTracks: _Optional[int] = ..., totalDuration: _Optional[_Union[_duration_pb2.Duration, _Mapping]] = ...) -> None: ...
+    def __init__(
+        self,
+        id: _Optional[str] = ...,
+        name: _Optional[str] = ...,
+        totalTracks: _Optional[int] = ...,
+        totalDuration: _Optional[_Union[_duration_pb2.Duration, _Mapping]] = ...,
+    ) -> None: ...
