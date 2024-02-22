@@ -1,5 +1,6 @@
 import asyncio
 from collections import ChainMap
+import sys
 from typing import Optional
 
 import grpc
@@ -80,10 +81,20 @@ class Music(Cog):
         self.queues: map[int, Queue] = {}
 
     async def _watch_queues(self):
-        async for msg in self.orca.Subscribe(Empty()):
-            msg: QueueChangeNotification
+        while True:
+            try:
+                async for msg in self.orca.Subscribe(Empty()):
+                    msg: QueueChangeNotification
 
-            self.bot.loop.create_task(self.on_queue_update(int(msg.guild)))
+                    self.bot.loop.create_task(self.on_queue_update(int(msg.guild)))
+            except Exception as e:
+                print(
+                    f"Exception occurred while listening to queue change notifications: {e}",
+                    file=sys.stderr,
+                )
+
+            # means error happened or connection was lost, try to restore after delay
+            await asyncio.sleep(5)
 
     async def stop_playing(self, guild_id):
         return await self.orca.Stop(GuildOnlyRequest(guildID=guild_id))
