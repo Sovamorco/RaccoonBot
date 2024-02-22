@@ -355,12 +355,16 @@ class Music(Cog):
 
     @hybrid_command(help="Команда для остановки плеера и очистки очереди")
     async def stop(self, ctx: Context):
+        cemb = Embed(
+            title="Вы уверены?",
+            description="Это действие остановит плеер и очистит очередь\nОтправьте `да` для подтверждения или `нет` для отмены",
+            color=Color.red(),
+        )
+
+        cemb.set_footer("Автоматическая отмена через 30 секунд")
+
         choicemsg = await ctx.send(
-            embed=Embed(
-                title="Вы уверены?",
-                description="Это действие остановит плеер и очистит очередь",
-                color=Color.red(),
-            ),
+            embed=cemb,
         )
 
         canc = False
