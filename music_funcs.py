@@ -52,7 +52,6 @@ class MusicCommandError(CommandInvokeError):
 
 
 class Queue:
-
     def __init__(
         self,
         orca: OrcaStub,
@@ -134,13 +133,18 @@ class Queue:
         )
         return embed
 
-    async def update(self):
+    # return value indicates whether to keep the queue in the queue map
+    async def update(self) -> bool:
         if self.message is None:
-            return
+            return True
 
-        await self.get()
+        try:
+            await self.get()
+        except QueueEmpty:
+            await self.message.delete()
 
-        if self.remaining == 0:
-            return await self.message.delete()
+            return False
 
         await self.message.edit(embed=self.embed)
+
+        return True

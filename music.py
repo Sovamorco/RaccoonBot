@@ -1,10 +1,11 @@
 import asyncio
+import sys
 from code import interact
 from collections import ChainMap
-import sys
 from typing import Optional
 
 import grpc
+from common import AsyncSQLClient
 from discord import Message
 from discord.ext.commands import Bot, Cog, Context, hybrid_command
 from google.protobuf.duration_pb2 import Duration
@@ -81,7 +82,39 @@ class Music(Cog):
             bot.loop.create_task(self._watch_queues())
 
         self.orca: OrcaStub = self.bot.orca
-        self.queues: map[int, Queue] = {}
+        self.sql_client: AsyncSQLClient = self.bot.sql_client
+        self.queues: map[Queue] = {}
+
+        self.bot.loop.create_task(self._init_queues())
+
+    async def _init_queues(self):
+        stored = await self.sql_client.sql_req(
+            "SELECT guild_id, channel_id, message_id, page FROM queues", fetch_all=True
+        )
+
+        for row in stored:
+            guild_id = row["guild_id"]
+            channel_id = row["channel_id"]
+            message_id = row["message_id"]
+            page = row["page"]
+
+            q = Queue(self.orca, guild_id, page)
+
+            try:
+                msg = self.bot.get_channel(channel_id).get_partial_message(message_id)
+            except Exception as e:
+                print(
+                    f"Error while fetching message {message_id} in channel {channel_id}: {e}",
+                    file=sys.stderr,
+                )
+
+                continue
+
+            q.message = msg
+
+            self.queues[guild_id] = q
+
+            self.bot.loop.create_task(self.on_queue_update(guild_id))
 
     async def _watch_queues(self):
         await asyncio.gather(
@@ -119,7 +152,15 @@ class Music(Cog):
             return
 
         q: Queue = self.queues[guild_id]
-        await q.update()
+        keep = await q.update()
+
+        if not keep:
+            self.queues.pop(guild_id, None)
+
+            await self.sql_client.sql_req(
+                "DELETE FROM queues WHERE guild_id=%s",
+                guild_id,
+            )
 
     async def _do_search(
         self, ctx: Context, query: str
@@ -375,7 +416,7 @@ class Music(Cog):
             color=Color.red(),
         )
 
-        cemb.set_footer("Автоматическая отмена через 30 секунд")
+        cemb.set_footer(text="Автоматическая отмена через 30 секунд")
 
         choicemsg = await ctx.send(
             embed=cemb,
@@ -507,6 +548,17 @@ class Music(Cog):
                     )
 
         self.queues[ctx.guild.id] = q
+
+        return await self.sql_client.sql_req(
+            "INSERT INTO queues (guild_id, channel_id, message_id, page) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE channel_id = %s, message_id = %s, page = %s",
+            ctx.guild.id,
+            ctx.channel.id,
+            msg.id,
+            page,
+            ctx.channel.id,
+            msg.id,
+            page,
+        )
 
     @hybrid_command(
         aliases=["r", "delete"],
