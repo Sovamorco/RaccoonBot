@@ -140,19 +140,21 @@ class Music(Cog):
     async def _periodic_queue_refresh(self):
         while True:
             for guild_id in self.queues:
-                self.bot.loop.create_task(self.on_queue_update(guild_id))
+                self.bot.loop.create_task(
+                    self.on_queue_update(guild_id, only_current=True)
+                )
 
-            await asyncio.sleep(30)
+            await asyncio.sleep(10)
 
     async def stop_playing(self, guild_id):
         return await self.orca.Stop(GuildOnlyRequest(guildID=guild_id))
 
-    async def on_queue_update(self, guild_id):
+    async def on_queue_update(self, guild_id, *, only_current=False):
         if guild_id not in self.queues:
             return
 
         q: Queue = self.queues[guild_id]
-        keep = await q.update()
+        keep = await q.update(only_current=only_current)
 
         if not keep:
             self.queues.pop(guild_id, None)

@@ -70,7 +70,7 @@ class Queue:
         self.total = 0
         self.remaining = 0
 
-    async def get(self):
+    async def get(self, *, only_current=False):
         currentres: GetTracksReply = await self.orca.GetTracks(
             GetTracksRequest(
                 guildID=str(self.guild_id),
@@ -82,6 +82,12 @@ class Queue:
             raise QueueEmpty
 
         current = currentres.tracks[0]
+
+        if only_current:
+            self.current = current
+            self.remaining = currentres.remaining
+
+            return
 
         res: GetTracksReply = await self.orca.GetTracks(
             GetTracksRequest(
@@ -134,12 +140,12 @@ class Queue:
         return embed
 
     # return value indicates whether to keep the queue in the queue map
-    async def update(self) -> bool:
+    async def update(self, *, only_current=False) -> bool:
         if self.message is None:
             return True
 
         try:
-            await self.get()
+            await self.get(only_current=only_current)
         except QueueEmpty:
             await self.message.delete()
 
