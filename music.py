@@ -65,6 +65,7 @@ class Music(Cog):
 
         if not hasattr(bot, "orca"):
             print("Creating orca connection")
+            # see https://github.com/grpc/grpc/issues/31442
             sess_interceptors = [
                 SessionUUInterceptor(self.bot.config["discord"]["token"]),
                 SessionUSInterceptor(self.bot.config["discord"]["token"]),
@@ -83,6 +84,11 @@ class Music(Cog):
         self.queues: map[int, Queue] = {}
 
     async def _watch_queues(self):
+        await asyncio.gather(
+            self._queue_notifications(), self._periodic_queue_refresh()
+        )
+
+    async def _queue_notifications(self):
         while True:
             try:
                 async for msg in self.orca.Subscribe(Empty()):
@@ -97,6 +103,13 @@ class Music(Cog):
 
             # means error happened or connection was lost, try to restore after delay
             await asyncio.sleep(5)
+
+    async def _periodic_queue_refresh(self):
+        while True:
+            for guild_id in self.queues:
+                self.bot.loop.create_task(self.on_queue_update(guild_id))
+
+            await asyncio.sleep(30)
 
     async def stop_playing(self, guild_id):
         return await self.orca.Stop(GuildOnlyRequest(guildID=guild_id))
