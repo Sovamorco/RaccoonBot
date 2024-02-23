@@ -4,7 +4,13 @@ import regex as re
 from discord import Color, Embed, Message
 from discord.ext.commands import CommandInvokeError
 
-from orca_pb2 import GetTracksReply, GetTracksRequest, TrackData
+from orca_pb2 import (
+    GetCurrentReply,
+    GetTracksReply,
+    GetTracksRequest,
+    GuildOnlyRequest,
+    TrackData,
+)
 from orca_pb2_grpc import OrcaStub
 
 
@@ -70,7 +76,7 @@ class Queue:
         self.total = 0
         self.remaining = 0
 
-    async def get(self, *, only_current=False):
+    async def get(self):
         currentres: GetTracksReply = await self.orca.GetTracks(
             GetTracksRequest(
                 guildID=str(self.guild_id),
@@ -82,12 +88,6 @@ class Queue:
             raise QueueEmpty
 
         current = currentres.tracks[0]
-
-        if only_current:
-            self.current = current
-            self.remaining = currentres.remaining
-
-            return
 
         res: GetTracksReply = await self.orca.GetTracks(
             GetTracksRequest(
@@ -103,6 +103,19 @@ class Queue:
         self.paused = res.paused
         self.total = res.totalTracks
         self.remaining = res.remaining
+
+    async def get_current(self):
+        currentres: GetCurrentReply = await self.orca.GetCurrent(
+            GuildOnlyRequest(
+                guildID=str(self.guild_id),
+            )
+        )
+        if currentres.track is None:
+            raise QueueEmpty
+
+        self.current = currentres.track
+        self.looping = currentres.looping
+        self.paused = currentres.paused
 
     @property
     def start(self):
@@ -145,7 +158,10 @@ class Queue:
             return True
 
         try:
-            await self.get(only_current=only_current)
+            if only_current:
+                await self.get_current()
+            else:
+                await self.get()
         except QueueEmpty:
             await self.message.delete()
 
