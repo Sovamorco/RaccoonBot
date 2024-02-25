@@ -1,3 +1,4 @@
+from asyncio import sleep
 from math import ceil
 from time import time
 
@@ -73,14 +74,20 @@ class UpdateRateLimiter:
         # rate is in seconds
         self.rate = rate
         self.last_update = 0
+        self.update_scheduled = False
 
-    @property
-    def can_update(self):
+    async def schedule_update(self):
         now = time()
         if (now - self.last_update) < self.rate:
-            return False
+            if self.update_scheduled:
+                return False
+
+            self.update_scheduled = True
+
+            await sleep(self.rate - (now - self.last_update))
 
         self.last_update = now
+        self.update_scheduled = False
 
         return True
 
@@ -365,7 +372,7 @@ class Queue:
         self.message: Message = None
         self._view: QueueControl = None
 
-        self.update_rl = UpdateRateLimiter(2.5)
+        self.update_rl = UpdateRateLimiter(4)
 
         self.current: TrackData = None
         self.tracks: list[TrackData] = []
@@ -467,7 +474,7 @@ class Queue:
         if self.message is None:
             return True
 
-        if not self.update_rl.can_update:
+        if not await self.update_rl.schedule_update():
             return True
 
         if self.page < 1:
