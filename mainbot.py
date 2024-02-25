@@ -1,22 +1,24 @@
-from asyncio import run
+import logging
+from asyncio import run, sleep
 from random import choice
 from traceback import print_exception
 
 from common import AsyncSQLClient, AsyncVaultClient, async_load_config
-from discord import ClientException, Intents, Streaming
+from discord import ClientException, Color, Embed, Intents, Streaming
 from discord.ext.commands import (
     BadArgument,
+    Bot,
     MissingRequiredArgument,
     when_mentioned_or,
 )
-from discord.app_commands import CommandTree
+from discord.utils import setup_logging
 
-from cookies import *
-from games import *
+from cookies import cookies_setup
+from games import games_setup
 from migrate import migrate
-from misc import *
-from moderation import *
-from music import *
+from misc import misc_setup
+from moderation import mod_setup
+from music import music_setup
 from utils import dev
 
 default_prefix = "?"
@@ -121,11 +123,8 @@ async def on_command_error(ctx, error):
         return await ctx.send(
             f"Неверный тип аргумента\nИспользование: {ctx.prefix}{ctx.command.usage or ctx.command.name}"
         )
-    elif isinstance(error, MusicCommandError):
-        return await ctx.send(error.original)
-    elif isinstance(error, CommandInvokeError) and str(error.original):
-        print_exception(type(error), error, error.__traceback__)
-        return await ctx.send(f"Ошибка:\n{error.original}")
+
+    print_exception(type(error), error, error.__traceback__)
 
 
 async def main():
@@ -140,6 +139,17 @@ async def main():
 
     bot.config = config
     bot.sql_client = sql_client
+
+    dt_fmt = "%Y-%m-%d %H:%M:%S"
+    formatter = logging.Formatter(
+        "[{asctime}] [{levelname:<8}] {name}: {message}", dt_fmt, style="{"
+    )
+
+    setup_logging(
+        handler=logging.StreamHandler(),
+        formatter=formatter,
+        level=logging.INFO,
+    )
 
     try:
         async with bot:

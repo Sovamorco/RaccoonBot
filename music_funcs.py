@@ -1,8 +1,8 @@
 from math import ceil
 
 import regex as re
-from discord import Color, Embed, Message
-from discord.ext.commands import CommandInvokeError
+from discord import ButtonStyle, Color, Embed, Interaction, Message
+from discord.ui import Button, View
 
 from orca_pb2 import (
     GetCurrentReply,
@@ -17,6 +17,8 @@ from orca_pb2_grpc import OrcaStub
 class QueueEmpty(Exception):
     pass
 
+
+PAGE_SIZE = 5
 
 spotify_rx = re.compile(
     r"(?:spotify:|(?:https?:\/\/)?(?:www\.)?open\.spotify\.com\/)(playlist|track|album)(?:\:|\/)([a-zA-Z0-9]+)(.*)$"
@@ -53,8 +55,139 @@ def format_time(t):
     return "%02d:%02d:%02d" % (hours, minutes, seconds)
 
 
-class MusicCommandError(CommandInvokeError):
-    pass
+class PauseButton(Button):
+    pause_id = 1211315174816874506
+    pause = f"<:pause:{pause_id}>"
+    resume_id = 1211315886179483688
+    resume = f"<:play:{resume_id}>"
+    choice = {
+        True: resume,
+        False: pause,
+    }
+
+    def __init__(self, queue: "Queue"):
+        super().__init__(
+            label="",
+            emoji=self.choice[queue.paused],
+            style=ButtonStyle.grey if queue.paused else ButtonStyle.blurple,
+        )
+
+        self.queue = queue
+        self.orca = queue.orca
+
+    async def callback(self, interaction: Interaction):
+        if self.emoji.id == self.pause_id:
+            await self.orca.Pause(
+                GuildOnlyRequest(
+                    guildID=str(self.queue.guild_id),
+                )
+            )
+        else:
+            await self.orca.Resume(
+                GuildOnlyRequest(
+                    guildID=str(self.queue.guild_id),
+                )
+            )
+
+        await self.queue.update(only_current=True)
+        await self.update()
+        await interaction.response.edit_message(view=self.view)
+
+    async def update(self):
+        self.emoji = self.choice[self.queue.paused]
+        self.style = ButtonStyle.grey if self.queue.paused else ButtonStyle.blurple
+
+
+class LoopButton(Button):
+    loop_emoji = "<:loop:1211318976286560318>"
+
+    def __init__(self, queue: "Queue"):
+        super().__init__(
+            label="",
+            emoji=self.loop_emoji,
+            style=ButtonStyle.blurple if queue.looping else ButtonStyle.grey,
+        )
+
+        self.queue = queue
+        self.orca = queue.orca
+
+    async def callback(self, interaction: Interaction):
+        await self.orca.Loop(
+            GuildOnlyRequest(
+                guildID=str(self.queue.guild_id),
+            )
+        )
+
+        await self.queue.update(only_current=True)
+        await self.update()
+        await interaction.response.edit_message(view=self.view)
+
+    async def update(self):
+        self.style = ButtonStyle.blurple if self.queue.looping else ButtonStyle.grey
+
+
+class SkipButton(Button):
+    skip_emoji = "<:skip:1211320197219090463>"
+
+    def __init__(self, queue: "Queue"):
+        super().__init__(
+            label="",
+            emoji=self.skip_emoji,
+            style=ButtonStyle.blurple,
+        )
+
+        self.queue = queue
+        self.orca = queue.orca
+
+    async def callback(self, interaction: Interaction):
+        await self.orca.Skip(
+            GuildOnlyRequest(
+                guildID=str(self.queue.guild_id),
+            )
+        )
+
+        await interaction.response.edit_message()
+
+
+class ShuffleButton(Button):
+    shuffle_emoji = "<:shuffle:1211326244965064754>"
+
+    def __init__(self, queue: "Queue"):
+        super().__init__(
+            label="",
+            emoji=self.shuffle_emoji,
+            style=ButtonStyle.blurple,
+        )
+
+        self.queue = queue
+        self.orca = queue.orca
+
+    async def callback(self, interaction: Interaction):
+        await self.orca.ShuffleQueue(
+            GuildOnlyRequest(
+                guildID=str(self.queue.guild_id),
+            )
+        )
+
+        await interaction.response.edit_message()
+
+
+class QueueControl(View):
+    def __init__(self, queue: "Queue"):
+        self.queue = queue
+
+        # no timeout for interactions
+        super().__init__(timeout=None)
+
+        self.add_item(PauseButton(queue))
+        self.add_item(LoopButton(queue))
+        self.add_item(SkipButton(queue))
+        self.add_item(ShuffleButton(queue))
+
+    async def update(self):
+        for child in self.children:
+            if hasattr(child, "update"):
+                await child.update()
 
 
 class Queue:
@@ -67,6 +200,7 @@ class Queue:
         self.orca = orca
         self.guild_id: int = guild_id
         self.message: Message = None
+        self._view: QueueControl = None
 
         self.current: TrackData = None
         self.tracks: list[TrackData] = []
@@ -92,8 +226,8 @@ class Queue:
         res: GetTracksReply = await self.orca.GetTracks(
             GetTracksRequest(
                 guildID=str(self.guild_id),
-                start=1 + 10 * (self.page - 1),
-                end=1 + 10 * self.page,
+                start=self.start,
+                end=self.start + PAGE_SIZE,
             )
         )
 
@@ -119,7 +253,7 @@ class Queue:
 
     @property
     def start(self):
-        return 1 + 10 * (self.page - 1)
+        return 1 + PAGE_SIZE * (self.page - 1)
 
     @property
     def color(self):
@@ -146,11 +280,18 @@ class Queue:
     def embed(self):
         embed = Embed(color=self.color, description=self._to_embed_content)
         embed.set_footer(
-            text=f"Страница: {self.page}/{ceil((self.total - 1) / 10)}\n"
+            text=f"Страница: {self.page}/{ceil((self.total - 1) / PAGE_SIZE)}\n"
             f"Всего треков: {self.total} ({format_time(self.remaining.ToSeconds())})\n"
             f'Повторение: {"вкл." if self.looping else "выкл."}'
         )
         return embed
+
+    @property
+    def view(self):
+        if self._view is None:
+            self._view = QueueControl(self)
+
+        return self._view
 
     # return value indicates whether to keep the queue in the queue map
     async def update(self, *, only_current=False) -> bool:
@@ -167,6 +308,7 @@ class Queue:
 
             return False
 
-        await self.message.edit(embed=self.embed)
+        await self.view.update()
+        await self.message.edit(embed=self.embed, view=self.view)
 
         return True

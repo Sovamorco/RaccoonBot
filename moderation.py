@@ -104,7 +104,7 @@ class Moderation(Cog):
     async def exec_(self, ctx, *, query):
         if str(ctx.author.id) == self.bot.config["discord"]["personal_id"]:
             exec(
-                f"async def __ex(ctx): "
+                "async def __ex(ctx): "
                 + "".join(f"\n {line}" for line in query.split("\n"))
             )
             result = await locals()["__ex"](ctx)

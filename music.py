@@ -1,21 +1,19 @@
 import asyncio
 import sys
-from code import interact
 from collections import ChainMap
 from typing import Optional
 
 import grpc
 from common import AsyncSQLClient
-from discord import Message
+from discord import Color, Embed, Message
 from discord.ext.commands import Bot, Cog, Context, hybrid_command
 from google.protobuf.duration_pb2 import Duration
 from google.protobuf.empty_pb2 import Empty
 from grpc.aio import UnaryStreamClientInterceptor, UnaryUnaryClientInterceptor
-from regex import E
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadCancelled
 
-from music_funcs import *
+from music_funcs import Queue, QueueEmpty, format_time, get_embed_color, url_rx
 from orca_pb2 import (
     GetTracksReply,
     GetTracksRequest,
@@ -270,6 +268,9 @@ class Music(Cog):
         if query == "":
             return await ctx.send("Запрос трека не может быть пустым")
 
+        if ctx.interaction is not None:
+            await ctx.interaction.response.defer()
+
         to_edit = None
 
         if not url_rx.match(query):
@@ -378,7 +379,7 @@ class Music(Cog):
             )
         )
 
-        return await ok(ctx, "Трек продолжен")
+        return await ok(ctx, "Трек возобновлен")
 
     @hybrid_command(help="Команда для включения/выключения повторения очереди")
     async def loop(self, ctx: Context):
@@ -533,9 +534,9 @@ class Music(Cog):
                 delete_after=60,
             )
 
-            msg = await ctx.channel.send(embed=q.embed)
+            msg = await ctx.channel.send(embed=q.embed, view=q.view)
         else:
-            msg = await ctx.reply(embed=q.embed)
+            msg = await ctx.reply(embed=q.embed, view=q.view)
 
         q.message = msg
 
