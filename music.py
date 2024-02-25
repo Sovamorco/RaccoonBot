@@ -13,7 +13,13 @@ from grpc.aio import UnaryStreamClientInterceptor, UnaryUnaryClientInterceptor
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadCancelled
 
-from music_funcs import Queue, QueueEmpty, format_time, get_embed_color, url_rx
+from music_funcs import (
+    Queue,
+    QueueEmpty,
+    format_time,
+    get_embed_color,
+    url_rx,
+)
 from orca_pb2 import (
     GetTracksReply,
     GetTracksRequest,
@@ -96,7 +102,7 @@ class Music(Cog):
             message_id = row["message_id"]
             page = row["page"]
 
-            q = Queue(self.orca, guild_id, page)
+            q = Queue(self.bot, self.orca, guild_id, page)
 
             try:
                 msg = self.bot.get_channel(channel_id).get_partial_message(message_id)
@@ -517,6 +523,7 @@ class Music(Cog):
             return await ctx.send("Страница не может быть отрицательной")
 
         q = Queue(
+            self.bot,
             self.orca,
             ctx.guild.id,
             page,

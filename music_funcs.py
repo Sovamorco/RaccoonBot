@@ -1,7 +1,9 @@
 from math import ceil
+from time import time
 
 import regex as re
 from discord import ButtonStyle, Color, Embed, Interaction, Message
+from discord.ext.commands import Bot
 from discord.ui import Button, View
 
 from orca_pb2 import (
@@ -55,6 +57,34 @@ def format_time(t):
     return "%02d:%02d:%02d" % (hours, minutes, seconds)
 
 
+async def voice_check(bot: Bot, interaction: Interaction):
+    my_voice = bot.get_guild(interaction.guild_id).me.voice
+    author_voice = interaction.user.voice
+
+    return (
+        my_voice is None
+        or author_voice is None
+        or my_voice.channel != author_voice.channel
+    )
+
+
+class UpdateRateLimiter:
+    def __init__(self, rate: int):
+        # rate is in seconds
+        self.rate = rate
+        self.last_update = 0
+
+    @property
+    def can_update(self):
+        now = time()
+        if (now - self.last_update) < self.rate:
+            return False
+
+        self.last_update = now
+
+        return True
+
+
 class PauseButton(Button):
     pause_id = 1211315174816874506
     pause = f"<:pause:{pause_id}>"
@@ -65,17 +95,29 @@ class PauseButton(Button):
         False: pause,
     }
 
-    def __init__(self, queue: "Queue"):
+    def __init__(self, bot: Bot, queue: "Queue"):
         super().__init__(
             label="",
             emoji=self.choice[queue.paused],
             style=ButtonStyle.grey if queue.paused else ButtonStyle.blurple,
         )
 
+        self.bot = bot
         self.queue = queue
         self.orca = queue.orca
 
     async def callback(self, interaction: Interaction):
+        if await voice_check(self.bot, interaction):
+            action = (
+                "приостановить" if self.emoji.id == self.pause_id else "возобновить"
+            )
+
+            return await interaction.response.send_message(
+                f"Вы должны находиться в одном голосовом канале с ботом, чтобы {action} воспроизведение.",
+                ephemeral=True,
+                delete_after=30,
+            )
+
         if self.emoji.id == self.pause_id:
             await self.orca.Pause(
                 GuildOnlyRequest(
@@ -89,9 +131,7 @@ class PauseButton(Button):
                 )
             )
 
-        await self.queue.update(only_current=True)
-        await self.update()
-        await interaction.response.edit_message(view=self.view)
+        await interaction.response.defer()
 
     async def update(self):
         self.emoji = self.choice[self.queue.paused]
@@ -118,9 +158,7 @@ class LoopButton(Button):
             )
         )
 
-        await self.queue.update(only_current=True)
-        await self.update()
-        await interaction.response.edit_message(view=self.view)
+        await interaction.response.defer()
 
     async def update(self):
         self.style = ButtonStyle.blurple if self.queue.looping else ButtonStyle.grey
@@ -129,47 +167,63 @@ class LoopButton(Button):
 class SkipButton(Button):
     skip_emoji = "<:skip:1211320197219090463>"
 
-    def __init__(self, queue: "Queue"):
+    def __init__(self, bot: Bot, queue: "Queue"):
         super().__init__(
             label="",
             emoji=self.skip_emoji,
             style=ButtonStyle.blurple,
         )
 
+        self.bot = bot
         self.queue = queue
         self.orca = queue.orca
 
     async def callback(self, interaction: Interaction):
+        if await voice_check(self.bot, interaction):
+            return await interaction.response.send_message(
+                "Вы должны находиться в одном голосовом канале с ботом, чтобы пропустить трек.",
+                ephemeral=True,
+                delete_after=30,
+            )
+
         await self.orca.Skip(
             GuildOnlyRequest(
                 guildID=str(self.queue.guild_id),
             )
         )
 
-        await interaction.response.edit_message()
+        await interaction.response.defer()
 
 
 class ShuffleButton(Button):
     shuffle_emoji = "<:shuffle:1211326244965064754>"
 
-    def __init__(self, queue: "Queue"):
+    def __init__(self, bot: Bot, queue: "Queue"):
         super().__init__(
             label="",
             emoji=self.shuffle_emoji,
             style=ButtonStyle.blurple,
         )
 
+        self.bot = bot
         self.queue = queue
         self.orca = queue.orca
 
     async def callback(self, interaction: Interaction):
+        if await voice_check(self.bot, interaction):
+            return await interaction.response.send_message(
+                "Вы должны находиться в одном голосовом канале с ботом, чтобы перемешать очередь.",
+                ephemeral=True,
+                delete_after=30,
+            )
+
         await self.orca.ShuffleQueue(
             GuildOnlyRequest(
                 guildID=str(self.queue.guild_id),
             )
         )
 
-        await interaction.response.edit_message()
+        await interaction.response.defer()
 
 
 class PrevButton(Button):
@@ -191,7 +245,7 @@ class PrevButton(Button):
         self.queue.page -= 1
         await self.queue.update()
 
-        await interaction.response.edit_message()
+        await interaction.response.defer()
 
     async def update(self):
         self.disabled = self.queue.page <= 1
@@ -216,7 +270,7 @@ class NextButton(Button):
         self.queue.page += 1
         await self.queue.update()
 
-        await interaction.response.edit_message()
+        await interaction.response.defer()
 
     async def update(self):
         self.disabled = self.queue.page >= self.queue.pages
@@ -241,7 +295,7 @@ class FirstButton(Button):
         self.queue.page = 1
         await self.queue.update()
 
-        await interaction.response.edit_message()
+        await interaction.response.defer()
 
     async def update(self):
         self.disabled = self.queue.page <= 1
@@ -266,23 +320,24 @@ class LastButton(Button):
         self.queue.page = self.queue.pages
         await self.queue.update()
 
-        await interaction.response.edit_message()
+        await interaction.response.defer()
 
     async def update(self):
         self.disabled = self.queue.page >= self.queue.pages
 
 
 class QueueControl(View):
-    def __init__(self, queue: "Queue"):
+
+    def __init__(self, queue: "Queue", bot: Bot):
         self.queue = queue
 
         # no timeout for interactions
         super().__init__(timeout=None)
 
-        self.add_item(PauseButton(queue))
+        self.add_item(PauseButton(bot, queue))
         self.add_item(LoopButton(queue))
-        self.add_item(SkipButton(queue))
-        self.add_item(ShuffleButton(queue))
+        self.add_item(SkipButton(bot, queue))
+        self.add_item(ShuffleButton(bot, queue))
 
         self.add_item(FirstButton(queue))
         self.add_item(PrevButton(queue))
@@ -296,16 +351,21 @@ class QueueControl(View):
 
 
 class Queue:
+
     def __init__(
         self,
+        bot: Bot,
         orca: OrcaStub,
         guild_id: int,
         page: int,
     ):
+        self.bot = bot
         self.orca = orca
         self.guild_id: int = guild_id
         self.message: Message = None
         self._view: QueueControl = None
+
+        self.update_rl = UpdateRateLimiter(2.5)
 
         self.current: TrackData = None
         self.tracks: list[TrackData] = []
@@ -398,13 +458,16 @@ class Queue:
     @property
     def view(self):
         if self._view is None:
-            self._view = QueueControl(self)
+            self._view = QueueControl(self, self.bot)
 
         return self._view
 
     # return value indicates whether to keep the queue in the queue map
     async def update(self, *, only_current=False) -> bool:
         if self.message is None:
+            return True
+
+        if not self.update_rl.can_update:
             return True
 
         if self.page < 1:
