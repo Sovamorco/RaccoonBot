@@ -172,6 +172,106 @@ class ShuffleButton(Button):
         await interaction.response.edit_message()
 
 
+class PrevButton(Button):
+    prev_emoji = "<:prev:1211338083371450368>"
+
+    def __init__(self, queue: "Queue"):
+        super().__init__(
+            label="",
+            emoji=self.prev_emoji,
+            style=ButtonStyle.blurple,
+            row=1,
+            disabled=queue.page <= 1,
+        )
+
+        self.queue = queue
+        self.orca = queue.orca
+
+    async def callback(self, interaction: Interaction):
+        self.queue.page -= 1
+        await self.queue.update()
+
+        await interaction.response.edit_message()
+
+    async def update(self):
+        self.disabled = self.queue.page <= 1
+
+
+class NextButton(Button):
+    next_emoji = "<:next:1211338081102471219>"
+
+    def __init__(self, queue: "Queue"):
+        super().__init__(
+            label="",
+            emoji=self.next_emoji,
+            style=ButtonStyle.blurple,
+            row=1,
+            disabled=queue.page >= queue.pages,
+        )
+
+        self.queue = queue
+        self.orca = queue.orca
+
+    async def callback(self, interaction: Interaction):
+        self.queue.page += 1
+        await self.queue.update()
+
+        await interaction.response.edit_message()
+
+    async def update(self):
+        self.disabled = self.queue.page >= self.queue.pages
+
+
+class FirstButton(Button):
+    first_emoji = "<:first:1211344347463942214>"
+
+    def __init__(self, queue: "Queue"):
+        super().__init__(
+            label="",
+            emoji=self.first_emoji,
+            style=ButtonStyle.blurple,
+            row=1,
+            disabled=queue.page <= 1,
+        )
+
+        self.queue = queue
+        self.orca = queue.orca
+
+    async def callback(self, interaction: Interaction):
+        self.queue.page = 1
+        await self.queue.update()
+
+        await interaction.response.edit_message()
+
+    async def update(self):
+        self.disabled = self.queue.page <= 1
+
+
+class LastButton(Button):
+    last_emoji = "<:last:1211344345580703884>"
+
+    def __init__(self, queue: "Queue"):
+        super().__init__(
+            label="",
+            emoji=self.last_emoji,
+            style=ButtonStyle.blurple,
+            row=1,
+            disabled=queue.page >= queue.pages,
+        )
+
+        self.queue = queue
+        self.orca = queue.orca
+
+    async def callback(self, interaction: Interaction):
+        self.queue.page = self.queue.pages
+        await self.queue.update()
+
+        await interaction.response.edit_message()
+
+    async def update(self):
+        self.disabled = self.queue.page >= self.queue.pages
+
+
 class QueueControl(View):
     def __init__(self, queue: "Queue"):
         self.queue = queue
@@ -183,6 +283,11 @@ class QueueControl(View):
         self.add_item(LoopButton(queue))
         self.add_item(SkipButton(queue))
         self.add_item(ShuffleButton(queue))
+
+        self.add_item(FirstButton(queue))
+        self.add_item(PrevButton(queue))
+        self.add_item(NextButton(queue))
+        self.add_item(LastButton(queue))
 
     async def update(self):
         for child in self.children:
@@ -256,6 +361,10 @@ class Queue:
         return 1 + PAGE_SIZE * (self.page - 1)
 
     @property
+    def pages(self):
+        return ceil((self.total - 1) / PAGE_SIZE)
+
+    @property
     def color(self):
         return get_embed_color(self.current.displayURL)
 
@@ -280,7 +389,7 @@ class Queue:
     def embed(self):
         embed = Embed(color=self.color, description=self._to_embed_content)
         embed.set_footer(
-            text=f"Страница: {self.page}/{ceil((self.total - 1) / PAGE_SIZE)}\n"
+            text=f"Страница: {self.page}/{self.pages}\n"
             f"Всего треков: {self.total} ({format_time(self.remaining.ToSeconds())})\n"
             f'Повторение: {"вкл." if self.looping else "выкл."}'
         )
@@ -298,6 +407,11 @@ class Queue:
         if self.message is None:
             return True
 
+        if self.page < 1:
+            self.page = 1
+        elif self.page > self.pages > 0:
+            self.page = self.pages
+
         try:
             if only_current:
                 await self.get_current()
@@ -307,6 +421,9 @@ class Queue:
             await self.message.delete()
 
             return False
+
+        if self.page > self.pages > 0:
+            self.page = self.pages
 
         await self.view.update()
         await self.message.edit(embed=self.embed, view=self.view)
