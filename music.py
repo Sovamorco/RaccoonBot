@@ -16,6 +16,7 @@ from yt_dlp.utils import DownloadCancelled
 from music_funcs import (
     Queue,
     QueueEmpty,
+    UpdateScope,
     format_time,
     get_embed_color,
     url_rx,
@@ -118,7 +119,12 @@ class Music(Cog):
 
             self.queues[guild_id] = q
 
-            self.bot.loop.create_task(self.on_queue_update(guild_id))
+            self.bot.loop.create_task(
+                self.on_queue_update(
+                    guild_id,
+                    scope=UpdateScope.CURRENT | UpdateScope.PAGE | UpdateScope.STATE,
+                )
+            )
 
     async def _watch_queues(self):
         await asyncio.gather(
@@ -131,7 +137,14 @@ class Music(Cog):
                 async for msg in self.orca.Subscribe(Empty()):
                     msg: QueueChangeNotification
 
-                    self.bot.loop.create_task(self.on_queue_update(int(msg.guild)))
+                    self.bot.loop.create_task(
+                        self.on_queue_update(
+                            int(msg.guild),
+                            scope=UpdateScope.CURRENT
+                            | UpdateScope.PAGE
+                            | UpdateScope.STATE,
+                        )
+                    )
             except Exception as e:
                 print(
                     f"Exception occurred while listening to queue change notifications: {e}",
@@ -145,7 +158,7 @@ class Music(Cog):
         while True:
             for guild_id in self.queues:
                 self.bot.loop.create_task(
-                    self.on_queue_update(guild_id, only_current=True)
+                    self.on_queue_update(guild_id, scope=UpdateScope.CURRENT)
                 )
 
             await asyncio.sleep(10)
@@ -153,12 +166,12 @@ class Music(Cog):
     async def stop_playing(self, guild_id):
         return await self.orca.Stop(GuildOnlyRequest(guildID=guild_id))
 
-    async def on_queue_update(self, guild_id, *, only_current=False):
+    async def on_queue_update(self, guild_id, *, scope: UpdateScope):
         if guild_id not in self.queues:
             return
 
         q: Queue = self.queues[guild_id]
-        keep = await q.update(only_current=only_current)
+        keep = await q.update(scope=scope)
 
         if not keep:
             self.queues.pop(guild_id, None)
@@ -530,7 +543,8 @@ class Music(Cog):
         )
 
         try:
-            await q.get()
+            for f in q.get_functions.values():
+                await f()
         except QueueEmpty:
             return await ctx.send("Ничего не играет")
 

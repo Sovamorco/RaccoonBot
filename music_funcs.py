@@ -1,3 +1,4 @@
+import enum
 from asyncio import sleep
 from math import ceil
 from time import time
@@ -8,7 +9,7 @@ from discord.ext.commands import Bot
 from discord.ui import Button, View
 
 from orca_pb2 import (
-    GetCurrentReply,
+    GetQueueStateReply,
     GetTracksReply,
     GetTracksRequest,
     GuildOnlyRequest,
@@ -67,6 +68,12 @@ async def voice_check(bot: Bot, interaction: Interaction):
         or author_voice is None
         or my_voice.channel != author_voice.channel
     )
+
+
+class UpdateScope(enum.IntFlag):
+    CURRENT = enum.auto()
+    PAGE = enum.auto()
+    STATE = enum.auto()
 
 
 class UpdateRateLimiter:
@@ -250,7 +257,7 @@ class PrevButton(Button):
 
     async def callback(self, interaction: Interaction):
         self.queue.page -= 1
-        await self.queue.update()
+        await self.queue.update(scope=UpdateScope.PAGE)
 
         await interaction.response.defer()
 
@@ -275,7 +282,7 @@ class NextButton(Button):
 
     async def callback(self, interaction: Interaction):
         self.queue.page += 1
-        await self.queue.update()
+        await self.queue.update(scope=UpdateScope.PAGE)
 
         await interaction.response.defer()
 
@@ -300,7 +307,7 @@ class FirstButton(Button):
 
     async def callback(self, interaction: Interaction):
         self.queue.page = 1
-        await self.queue.update()
+        await self.queue.update(scope=UpdateScope.PAGE)
 
         await interaction.response.defer()
 
@@ -325,7 +332,7 @@ class LastButton(Button):
 
     async def callback(self, interaction: Interaction):
         self.queue.page = self.queue.pages
-        await self.queue.update()
+        await self.queue.update(scope=UpdateScope.PAGE)
 
         await interaction.response.defer()
 
@@ -358,7 +365,6 @@ class QueueControl(View):
 
 
 class Queue:
-
     def __init__(
         self,
         bot: Bot,
@@ -373,6 +379,7 @@ class Queue:
         self._view: QueueControl = None
 
         self.update_rl = UpdateRateLimiter(4)
+        self.scheduled_update = UpdateScope(0)
 
         self.current: TrackData = None
         self.tracks: list[TrackData] = []
@@ -382,19 +389,7 @@ class Queue:
         self.total = 0
         self.remaining = 0
 
-    async def get(self):
-        currentres: GetTracksReply = await self.orca.GetTracks(
-            GetTracksRequest(
-                guildID=str(self.guild_id),
-                start=0,
-                end=1,
-            )
-        )
-        if len(currentres.tracks) < 1:
-            raise QueueEmpty
-
-        current = currentres.tracks[0]
-
+    async def get_page(self):
         res: GetTracksReply = await self.orca.GetTracks(
             GetTracksRequest(
                 guildID=str(self.guild_id),
@@ -403,25 +398,40 @@ class Queue:
             )
         )
 
-        self.current = current
+        if len(res.tracks) < 1:
+            raise QueueEmpty
+
         self.tracks = res.tracks
         self.looping = res.looping
         self.paused = res.paused
-        self.total = res.totalTracks
-        self.remaining = res.remaining
 
     async def get_current(self):
-        currentres: GetCurrentReply = await self.orca.GetCurrent(
+        res: GetTracksReply = await self.orca.GetTracks(
+            GetTracksRequest(
+                guildID=str(self.guild_id),
+                start=0,
+                end=1,
+            )
+        )
+
+        if len(res.tracks) < 1:
+            raise QueueEmpty
+
+        self.current = res.tracks[0]
+        self.looping = res.looping
+        self.paused = res.paused
+
+    async def get_state(self):
+        queue_state: GetQueueStateReply = await self.orca.GetQueueState(
             GuildOnlyRequest(
                 guildID=str(self.guild_id),
             )
         )
-        if currentres.track is None:
-            raise QueueEmpty
 
-        self.current = currentres.track
-        self.looping = currentres.looping
-        self.paused = currentres.paused
+        self.total = queue_state.totalTracks
+        self.remaining = queue_state.remaining
+        self.paused = queue_state.paused
+        self.looping = queue_state.looping
 
     @property
     def start(self):
@@ -469,13 +479,31 @@ class Queue:
 
         return self._view
 
+    @property
+    def get_functions(self):
+        return {
+            UpdateScope.STATE: self.get_state,
+            UpdateScope.CURRENT: self.get_current,
+            UpdateScope.PAGE: self.get_page,
+        }
+
     # return value indicates whether to keep the queue in the queue map
-    async def update(self, *, only_current=False) -> bool:
+    async def update(
+        self,
+        *,
+        scope: UpdateScope,
+    ) -> bool:
+        for el in scope:
+            self.scheduled_update |= el
+
         if self.message is None:
             return True
 
         if not await self.update_rl.schedule_update():
             return True
+
+        update_scope = self.scheduled_update
+        self.scheduled_update = UpdateScope(0)
 
         if self.page < 1:
             self.page = 1
@@ -483,10 +511,8 @@ class Queue:
             self.page = self.pages
 
         try:
-            if only_current:
-                await self.get_current()
-            else:
-                await self.get()
+            for el in update_scope:
+                await self.get_functions[el]()
         except QueueEmpty:
             await self.message.delete()
 
