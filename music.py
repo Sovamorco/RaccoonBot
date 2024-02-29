@@ -12,6 +12,7 @@ from google.protobuf.empty_pb2 import Empty
 from grpc.aio import UnaryStreamClientInterceptor, UnaryUnaryClientInterceptor
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadCancelled
+from grpc_status import rpc_status
 
 from music_funcs import (
     Queue,
@@ -22,6 +23,10 @@ from music_funcs import (
     url_rx,
 )
 from orca_pb2 import (
+    ErrNoExtractor,
+    ErrNoResults,
+    ErrQueueTooLarge,
+    ErrorCodeWrapper,
     GetTracksReply,
     GetTracksRequest,
     GuildOnlyRequest,
@@ -300,6 +305,14 @@ class Music(Cog):
 
                 return
 
+        if to_edit is None:
+            loading_embed = Embed(
+                title="⏳Загрузка...",
+                color=Color.red(),
+            )
+
+            to_edit = await ctx.send(embed=loading_embed)
+
         req = PlayRequest(
             guildID=str(ctx.guild.id),
             channelID=str(ctx.author.voice.channel.id),
@@ -307,7 +320,34 @@ class Music(Cog):
         )
         if pos is not None:
             req.position = pos
-        res: PlayReply = await self.orca.Play(req)
+
+        try:
+            res: PlayReply = await self.orca.Play(req)
+        except grpc.RpcError as rpc_error:
+            error_embed = Embed(
+                title="❌Ошибка",
+                description="Неизвестная ошибка",
+                color=Color.red(),
+            )
+
+            status = rpc_status.from_call(rpc_error)
+            for detail in status.details:
+                if not detail.Is(ErrorCodeWrapper.DESCRIPTOR):
+                    continue
+
+                ecw = ErrorCodeWrapper()
+                detail.Unpack(ecw)
+
+                if ecw.code == ErrNoExtractor:
+                    error_embed.description = "Этот сервис не поддерживается"
+                elif ecw.code == ErrNoResults:
+                    error_embed.description = "Ничего не найдено"
+                elif ecw.code == ErrQueueTooLarge:
+                    error_embed.description = "Очередь слишком большая"
+
+                break
+
+            return await to_edit.edit(embed=error_embed)
 
         color = get_embed_color(query)
         embed = Embed(color=color)
@@ -323,10 +363,7 @@ class Music(Cog):
             if res.total > 10:
                 embed.description += f"\n... и еще {res.total - 10}"
 
-        if to_edit is not None:
-            return await to_edit.edit(embed=embed)
-
-        return await ctx.send(embed=embed)
+        return await to_edit.edit(embed=embed)
 
     @hybrid_command(
         aliases=["p"],

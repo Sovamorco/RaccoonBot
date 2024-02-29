@@ -12,3 +12,4 @@ grpcio-tools~=1.0
 pyOpenSSL~=23.0
 protobuf~=4.23.4
 yt-dlp~=2023.0
+grpcio-status~=1.0
