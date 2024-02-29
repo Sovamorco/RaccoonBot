@@ -659,7 +659,6 @@ class Music(Cog):
     async def playlists(self, ctx: Context):
         res: ListPlaylistsReply = await self.orca.ListPlaylists(
             ListPlaylistsRequest(
-                guildID=str(ctx.guild.id),
                 userID=str(ctx.author.id),
             )
         )
@@ -687,7 +686,6 @@ class Music(Cog):
 
         res: ListPlaylistsReply = await self.orca.ListPlaylists(
             ListPlaylistsRequest(
-                guildID=str(ctx.guild.id),
                 userID=str(ctx.author.id),
             )
         )
