@@ -386,8 +386,8 @@ class Queue:
         self.looping = False
         self.paused = False
         self.page = page
-        self.total = 0
-        self.remaining = 0
+        self.total_tracks = 0
+        self.remaining_duration = 0
 
     async def get_page(self):
         res: GetTracksReply = await self.orca.GetTracks(
@@ -397,9 +397,6 @@ class Queue:
                 end=self.start + PAGE_SIZE,
             )
         )
-
-        if len(res.tracks) < 1:
-            raise QueueEmpty
 
         self.tracks = res.tracks
         self.looping = res.looping
@@ -428,8 +425,8 @@ class Queue:
             )
         )
 
-        self.total = queue_state.totalTracks
-        self.remaining = queue_state.remaining
+        self.total_tracks = queue_state.totalTracks
+        self.remaining_duration = queue_state.remaining
         self.paused = queue_state.paused
         self.looping = queue_state.looping
 
@@ -439,7 +436,7 @@ class Queue:
 
     @property
     def pages(self):
-        return ceil((self.total - 1) / PAGE_SIZE)
+        return ceil((self.total_tracks - 1) / PAGE_SIZE)
 
     @property
     def color(self):
@@ -467,7 +464,7 @@ class Queue:
         embed = Embed(color=self.color, description=self._to_embed_content)
         embed.set_footer(
             text=f"Страница: {self.page}/{self.pages}\n"
-            f"Всего треков: {self.total} ({format_time(self.remaining.ToSeconds())})\n"
+            f"Всего треков: {self.total_tracks} ({format_time(self.remaining_duration.ToSeconds())})\n"
             f'Повторение: {"вкл." if self.looping else "выкл."}'
         )
         return embed
