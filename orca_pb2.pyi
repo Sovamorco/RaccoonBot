@@ -14,10 +14,16 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ErrQueueTooLarge: _ClassVar[ErrorCode]
     ErrNoExtractor: _ClassVar[ErrorCode]
     ErrNoResults: _ClassVar[ErrorCode]
+    ErrCaptcha: _ClassVar[ErrorCode]
 ErrNone: ErrorCode
 ErrQueueTooLarge: ErrorCode
 ErrNoExtractor: ErrorCode
 ErrNoResults: ErrorCode
+ErrCaptcha: ErrorCode
+
+class HealthRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
 
 class JoinRequest(_message.Message):
     __slots__ = ("guildID", "channelID")

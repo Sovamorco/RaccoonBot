@@ -23,6 +23,7 @@ from music_funcs import (
     url_rx,
 )
 from orca_pb2 import (
+    ErrCaptcha,
     ErrNoExtractor,
     ErrNoResults,
     ErrQueueTooLarge,
@@ -342,6 +343,8 @@ class Music(Cog):
                     error_embed.description = "Этот сервис не поддерживается"
                 elif ecw.code == ErrNoResults:
                     error_embed.description = "Ничего не найдено"
+                elif ecw.code == ErrCaptcha:
+                    error_embed.description = "Сервис требует капчу, но я робот"
                 elif ecw.code == ErrQueueTooLarge:
                     error_embed.description = "Очередь слишком большая"
 
