@@ -34,6 +34,7 @@ embed_colors = {
     "youtu.be": Color.red(),
     "open.spotify.com": Color.green(),
     "soundcloud.com": Color.orange(),
+    "music.yandex.": Color.yellow(),
     "twitch.tv": Color.purple(),
     "bandcamp.com": Color.blue(),
     "vk.com": Color.blue(),
