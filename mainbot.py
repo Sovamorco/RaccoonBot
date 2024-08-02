@@ -8,6 +8,7 @@ from discord import ClientException, Color, Embed, Intents, Streaming
 from discord.ext.commands import (
     BadArgument,
     Bot,
+    MissingPermissions,
     MissingRequiredArgument,
     when_mentioned_or,
 )
@@ -122,6 +123,10 @@ async def on_command_error(ctx, error):
     elif isinstance(error, BadArgument):
         return await ctx.send(
             f"Неверный тип аргумента\nИспользование: {ctx.prefix}{ctx.command.usage or ctx.command.name}"
+        )
+    elif isinstance(error, MissingPermissions):
+        return await ctx.send(
+            f"У вас нет прав для использования этой команды\nНеобходимые права: {','.join(error.missing_permissions)}"
         )
 
     print_exception(type(error), error, error.__traceback__)

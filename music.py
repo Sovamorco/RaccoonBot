@@ -6,13 +6,13 @@ from typing import Optional
 import grpc
 from common import AsyncSQLClient
 from discord import Color, Embed, Message
-from discord.ext.commands import Bot, Cog, Context, hybrid_command
+from discord.ext.commands import Bot, Cog, Context, hybrid_command, has_permissions
 from google.protobuf.duration_pb2 import Duration
 from google.protobuf.empty_pb2 import Empty
 from grpc.aio import UnaryStreamClientInterceptor, UnaryUnaryClientInterceptor
+from grpc_status import rpc_status
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadCancelled
-from grpc_status import rpc_status
 
 from music_funcs import (
     Queue,
@@ -26,8 +26,8 @@ from orca_pb2 import (
     ErrCaptcha,
     ErrNoExtractor,
     ErrNoResults,
-    ErrQueueTooLarge,
     ErrorCodeWrapper,
+    ErrQueueTooLarge,
     GetTracksReply,
     GetTracksRequest,
     GuildOnlyRequest,
@@ -109,7 +109,7 @@ class Music(Cog):
             message_id = row["message_id"]
             page = row["page"]
 
-            q = Queue(self.bot, self.orca, guild_id, page)
+            q = Queue(self.bot, self, self.orca, guild_id, page)
 
             try:
                 msg = self.bot.get_channel(channel_id).get_partial_message(message_id)
@@ -442,6 +442,15 @@ class Music(Cog):
 
     @hybrid_command(help="Команда для включения/выключения повторения очереди")
     async def loop(self, ctx: Context):
+        if await self.check_for_soup(ctx.guild.id):
+            return await ctx.send(
+                embed=Embed(
+                    title="🍲 Вечный суп",
+                    description="Нельзя выключить повторение очереди, потому что на этом сервере включен режим вечного супа",
+                    color=Color.red(),
+                )
+            )
+
         await self.orca.Loop(
             GuildOnlyRequest(
                 guildID=str(ctx.guild.id),
@@ -472,6 +481,15 @@ class Music(Cog):
 
     @hybrid_command(help="Команда для остановки плеера и очистки очереди")
     async def stop(self, ctx: Context):
+        if await self.check_for_soup(ctx.guild.id):
+            return await ctx.send(
+                embed=Embed(
+                    title="🍲 Вечный суп",
+                    description="Нельзя очистить очередь, потому что на этом сервере включен режим вечного супа",
+                    color=Color.red(),
+                )
+            )
+
         cemb = Embed(
             title="Вы уверены?",
             description="Это действие остановит плеер и очистит очередь\nОтправьте `да` для подтверждения или `нет` для отмены",
@@ -577,6 +595,7 @@ class Music(Cog):
 
         q = Queue(
             self.bot,
+            self,
             self.orca,
             ctx.guild.id,
             page,
@@ -766,6 +785,53 @@ class Music(Cog):
                 embed.description += f"\n... и еще {res.total - 10}"
 
         return await ctx.send(embed=embed)
+
+    @hybrid_command(help="Команда для переключения режима вечного супа")
+    @has_permissions(administrator=True)
+    async def soup(self, ctx: Context):
+        soup_col = await self.sql_client.sql_req(
+            "SELECT soup FROM server_data WHERE id=%s", ctx.guild.id, fetch_one=True
+        )
+
+        if not soup_col:
+            return await ctx.send("Ошибка - супа нет")
+
+        soup_enabled = soup_col["soup"]
+
+        await self.sql_client.sql_req(
+            "UPDATE server_data SET soup=%s WHERE id=%s",
+            0 if soup_enabled else 1,
+            ctx.guild.id,
+        )
+
+        if soup_enabled:
+            return await ctx.send(
+                embed=Embed(title="🥣 Суп выключен", color=Color.red())
+            )
+
+        queue_state: GetTracksReply = await self.orca.GetTracks(
+            GetTracksRequest(
+                guildID=str(ctx.guild.id),
+                start=0,
+                end=0,
+            )
+        )
+
+        if not queue_state.looping:
+            await self.orca.Loop(
+                GuildOnlyRequest(
+                    guildID=str(ctx.guild.id),
+                )
+            )
+
+        return await ctx.send(embed=Embed(title="🍲 Суп включен", color=Color.green()))
+
+    async def check_for_soup(self, guild_id: int) -> bool:
+        soup_col = await self.sql_client.sql_req(
+            "SELECT soup FROM server_data WHERE id=%s", guild_id, fetch_one=True
+        )
+
+        return soup_col and soup_col["soup"]
 
 
 async def music_setup(bot):

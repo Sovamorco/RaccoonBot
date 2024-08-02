@@ -156,22 +156,26 @@ class PauseButton(Button):
 class LoopButton(Button):
     loop_emoji = "<:loop:1211318976286560318>"
 
-    def __init__(self, queue: "Queue"):
+    def __init__(self, music, queue: "Queue"):
+        from music import Music
+
         super().__init__(
             label="",
             emoji=self.loop_emoji,
             style=ButtonStyle.blurple if queue.looping else ButtonStyle.grey,
         )
 
+        self.music: Music = music
         self.queue = queue
         self.orca = queue.orca
 
     async def callback(self, interaction: Interaction):
-        await self.orca.Loop(
-            GuildOnlyRequest(
-                guildID=str(self.queue.guild_id),
+        if not await self.music.check_for_soup(interaction.guild.id):
+            await self.orca.Loop(
+                GuildOnlyRequest(
+                    guildID=str(self.queue.guild_id),
+                )
             )
-        )
 
         await interaction.response.defer()
 
@@ -343,14 +347,14 @@ class LastButton(Button):
 
 class QueueControl(View):
 
-    def __init__(self, queue: "Queue", bot: Bot):
+    def __init__(self, queue: "Queue", bot: Bot, music):
         self.queue = queue
 
         # no timeout for interactions
         super().__init__(timeout=None)
 
         self.add_item(PauseButton(bot, queue))
-        self.add_item(LoopButton(queue))
+        self.add_item(LoopButton(music, queue))
         self.add_item(SkipButton(bot, queue))
         self.add_item(ShuffleButton(bot, queue))
 
@@ -366,14 +370,17 @@ class QueueControl(View):
 
 
 class Queue:
+
     def __init__(
         self,
         bot: Bot,
+        music,
         orca: OrcaStub,
         guild_id: int,
         page: int,
     ):
         self.bot = bot
+        self.music = music
         self.orca = orca
         self.guild_id: int = guild_id
         self.message: Message = None
@@ -473,7 +480,7 @@ class Queue:
     @property
     def view(self):
         if self._view is None:
-            self._view = QueueControl(self, self.bot)
+            self._view = QueueControl(self, self.bot, self.music)
 
         return self._view
 
