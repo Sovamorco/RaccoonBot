@@ -9,7 +9,7 @@ discord:
   personal_id: VAULT->raccoonbot/personal_id
 
 orca:
-  address: orca:8590
+  address: orca.virtual.consul:8590
 
 genius_token: VAULT->raccoonbot/genius_token
 gachi_things: VAULT->raccoonbot/gachi_things
