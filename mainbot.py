@@ -3,7 +3,7 @@ from asyncio import run, sleep
 from random import choice
 from traceback import print_exception
 
-from common import AsyncSQLClient, AsyncVaultClient, async_load_config
+from common import AsyncSQLClient, VaultClient, async_load_config
 from discord import ClientException, Color, Embed, Intents, Streaming
 from discord.ext.commands import (
     BadArgument,
@@ -133,7 +133,7 @@ async def on_command_error(ctx, error):
 
 
 async def main():
-    vault_client = AsyncVaultClient.from_env() if not dev else None
+    vault_client = VaultClient.from_env() if not dev else None
     config = await async_load_config(
         "config.dev.yaml" if dev else "config.yaml", vault_client=vault_client
     )

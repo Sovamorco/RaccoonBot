@@ -4,7 +4,7 @@ beautifulsoup4~=4.0
 pathvalidate~=2.0
 pymorphy3~=2.0
 GitPython~=3.0
-common[async,sql_async] @ git+https://github.com/Sovamorco/common
+common[sql_async] @ git+https://github.com/Sovamorco/common
 discord.py[voice]~=2.0
 yoyo-migrations~=8.0
 grpcio~=1.0
